@@ -3,5 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.16.0"
+  "packageManager": "pnpm@11.16.0",
+  "scripts": {
+    "check": "biome check . && pnpm typecheck && pnpm test",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "lint": "biome lint .",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests",
+    "typecheck": "tsc --build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.7",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
 }

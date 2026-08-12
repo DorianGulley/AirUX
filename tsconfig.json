@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./apps/worker" },
+    { "path": "./packages/mcp" },
+    { "path": "./packages/shared" }
+  ]
+}
