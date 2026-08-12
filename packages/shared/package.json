@@ -2,5 +2,12 @@
   "name": "@airux/shared",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./v1": "./src/v1/index.ts"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  }
 }
