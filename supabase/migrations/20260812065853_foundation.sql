@@ -1,0 +1,1 @@
+-- Establish the AirUX migration history. The application schema is added in M1-6.
