@@ -58,6 +58,40 @@ A phase is not complete until its gate is satisfied.
 
 Do not skip ahead because a later phase appears straightforward.
 
+### 5. Use repository automation first
+
+Use the repository's root `pnpm` commands as the default interface for setup,
+development, and verification. Prefer these versioned commands over ad hoc
+equivalents so local agents, remote agents, and CI run the same workflow.
+
+The standard AirUX automation commands are:
+
+| Command | Purpose |
+|---|---|
+| `pnpm install --frozen-lockfile` | Install the exact dependency graph without changing the lockfile. |
+| `pnpm check` | Run formatting and lint checks, TypeScript validation, and the test suite. |
+| `pnpm format` | Apply repository formatting when files need it. |
+| `pnpm test <file-or-pattern>` | Run focused tests during implementation. |
+| `pnpm db:start` | Start the local Supabase stack. |
+| `pnpm db:migration:new <name>` | Create a timestamped database migration. |
+| `pnpm db:reset` | Rebuild the local database from versioned migrations. |
+| `pnpm db:lint` | Check the local database schema for errors. |
+| `pnpm db:stop` | Stop the local Supabase stack. |
+
+Agents should run these commands themselves whenever the environment permits.
+Do not ask the human to run an existing project command merely because it starts
+a local service, downloads a tool image, or takes several minutes. Handle
+transient failures and routine prerequisites autonomously, and stop services
+started for verification when they are no longer needed.
+
+Human action is appropriate only when automation reaches an actual external
+boundary, such as interactive account authorization, an unavailable credential,
+a required approval, or hardware the agent cannot access.
+
+When a repeated project operation has no command, add the smallest useful root
+script if doing so is within the task's scope. Avoid scripts for one-off commands
+that would not make later agent or CI runs faster or more reliable.
+
 ---
 
 # Phase 1 — Design Decisions
@@ -101,6 +135,8 @@ The agent owns the implementation process, including:
 - preserving established codebase conventions
 - fixing issues discovered while implementing
 - performing reasonable refactors necessary for a clean implementation
+- adding or updating project automation when it makes repeated setup or
+  verification deterministic
 
 Tests are part of the implementation, not a later optional step.
 
@@ -126,6 +162,11 @@ Then proceed to Phase 3.
 # Phase 3 — Automated Verification
 
 Run the relevant automated test suite.
+
+For AirUX, run `pnpm check` from the repository root as the default complete
+verification pass. Individual commands such as `pnpm test`, `pnpm typecheck`, or
+`pnpm lint` may be used for faster iteration, but they do not replace the final
+`pnpm check` run.
 
 This may include, as appropriate:
 
@@ -172,6 +213,11 @@ Typical examples include:
 - flows that require credentials or an environment unavailable to the agent
 
 Whenever the agent can perform the functional verification directly, it should do so.
+
+For database changes, the agent should start the local stack, rebuild it from
+migrations, lint the schema, and stop the stack using the repository's `pnpm`
+database commands. For browser and UI work, use available browser automation to
+exercise the relevant flow before requesting human verification.
 
 Human verification should be requested only when the agent cannot reasonably perform the check itself.
 
