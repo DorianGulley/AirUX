@@ -1,0 +1,212 @@
+import { z } from "zod";
+
+import {
+  identifierSchema,
+  nonNegativeIntegerSchema,
+  positiveIntegerSchema,
+  utcTimestampSchema,
+} from "./common.js";
+import { CONTRACT_LIMITS } from "./limits.js";
+
+export const REVIEW_STATES = [
+  "draft",
+  "pending",
+  "approved",
+  "changes_requested",
+  "cancelled",
+  "expired",
+] as const;
+
+export const EVIDENCE_STATES = [
+  "awaiting_upload",
+  "processing",
+  "ready",
+  "failed",
+  "deleting",
+  "deleted",
+] as const;
+
+export const DECISION_OUTCOMES = ["approved", "changes_requested"] as const;
+
+export const EVIDENCE_KINDS = ["browser_video"] as const;
+
+export const reviewStateSchema = z.enum(REVIEW_STATES);
+export const evidenceStateSchema = z.enum(EVIDENCE_STATES);
+export const decisionOutcomeSchema = z.enum(DECISION_OUTCOMES);
+export const evidenceKindSchema = z.enum(EVIDENCE_KINDS);
+
+export const reviewCriterionSchema = z
+  .object({
+    id: z.string().trim().min(1).max(CONTRACT_LIMITS.criterionIdLength),
+    prompt: z.string().trim().min(1).max(CONTRACT_LIMITS.criterionPromptLength),
+  })
+  .strict();
+
+export const reviewCriteriaSchema = z
+  .array(reviewCriterionSchema)
+  .min(1)
+  .max(CONTRACT_LIMITS.criteriaCount)
+  .superRefine((criteria, context) => {
+    const ids = new Set<string>();
+
+    for (const [index, criterion] of criteria.entries()) {
+      if (ids.has(criterion.id)) {
+        context.addIssue({
+          code: "custom",
+          message: "Criterion IDs must be unique",
+          path: [index, "id"],
+        });
+      }
+      ids.add(criterion.id);
+    }
+  });
+
+export const browserVideoEvidenceInputSchema = z
+  .object({
+    kind: z.literal("browser_video"),
+    media_type: z
+      .string()
+      .regex(/^video\/[a-z0-9][a-z0-9.+-]*$/i, "Expected a video media type"),
+    size_bytes: positiveIntegerSchema.max(CONTRACT_LIMITS.mediaSizeBytes),
+  })
+  .strict();
+
+export const createReviewRequestSchema = z
+  .object({
+    client_request_id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.clientRequestIdLength),
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    claim: z.string().trim().min(1).max(CONTRACT_LIMITS.claimLength),
+    criteria: reviewCriteriaSchema,
+    evidence: browserVideoEvidenceInputSchema,
+  })
+  .strict();
+
+export const createReviewResponseSchema = z
+  .object({
+    review_id: identifierSchema,
+    review_url: z.url(),
+    status: z.literal("draft"),
+    evidence_id: identifierSchema,
+    upload_url: z.url(),
+    upload_expires_at: utcTimestampSchema,
+  })
+  .strict();
+
+export const decisionRequestSchema = z
+  .object({
+    expected_version: nonNegativeIntegerSchema,
+    outcome: decisionOutcomeSchema,
+    comment: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.commentLength)
+      .optional(),
+  })
+  .strict()
+  .superRefine((decision, context) => {
+    if (
+      decision.outcome === "changes_requested" &&
+      decision.comment === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A comment is required when requesting changes",
+        path: ["comment"],
+      });
+    }
+  });
+
+export const reviewSchema = z
+  .object({
+    id: identifierSchema,
+    user_id: identifierSchema,
+    agent_credential_id: identifierSchema,
+    client_request_id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.clientRequestIdLength),
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    claim: z.string().trim().min(1).max(CONTRACT_LIMITS.claimLength),
+    criteria: reviewCriteriaSchema,
+    status: reviewStateSchema,
+    version: nonNegativeIntegerSchema,
+    created_at: utcTimestampSchema,
+    submitted_at: utcTimestampSchema.nullable(),
+    expires_at: utcTimestampSchema,
+    resolved_at: utcTimestampSchema.nullable(),
+    deleted_at: utcTimestampSchema.nullable(),
+  })
+  .strict();
+
+export const evidenceSchema = z
+  .object({
+    id: identifierSchema,
+    review_id: identifierSchema,
+    kind: evidenceKindSchema,
+    status: evidenceStateSchema,
+    stream_video_id: identifierSchema.nullable(),
+    media_type: z
+      .string()
+      .regex(/^video\/[a-z0-9][a-z0-9.+-]*$/i, "Expected a video media type"),
+    size_bytes: positiveIntegerSchema.max(CONTRACT_LIMITS.mediaSizeBytes),
+    duration_ms: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.captureDurationMs)
+      .nullable(),
+    width: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.viewportWidth.max)
+      .nullable(),
+    height: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.viewportHeight.max)
+      .nullable(),
+    failure_code: z.string().trim().min(1).max(128).nullable(),
+    delete_after: utcTimestampSchema,
+    deleted_at: utcTimestampSchema.nullable(),
+    created_at: utcTimestampSchema,
+  })
+  .strict();
+
+export const decisionSchema = z
+  .object({
+    id: identifierSchema,
+    review_id: identifierSchema,
+    user_id: identifierSchema,
+    outcome: decisionOutcomeSchema,
+    comment: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.commentLength)
+      .nullable(),
+    created_at: utcTimestampSchema,
+  })
+  .strict()
+  .superRefine((decision, context) => {
+    if (decision.outcome === "changes_requested" && decision.comment === null) {
+      context.addIssue({
+        code: "custom",
+        message: "A comment is required when requesting changes",
+        path: ["comment"],
+      });
+    }
+  });
+
+export type ReviewState = z.infer<typeof reviewStateSchema>;
+export type EvidenceState = z.infer<typeof evidenceStateSchema>;
+export type DecisionOutcome = z.infer<typeof decisionOutcomeSchema>;
+export type EvidenceKind = z.infer<typeof evidenceKindSchema>;
+export type ReviewCriterion = z.infer<typeof reviewCriterionSchema>;
+export type BrowserVideoEvidenceInput = z.infer<
+  typeof browserVideoEvidenceInputSchema
+>;
+export type CreateReviewRequest = z.infer<typeof createReviewRequestSchema>;
+export type CreateReviewResponse = z.infer<typeof createReviewResponseSchema>;
+export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
+export type Review = z.infer<typeof reviewSchema>;
+export type Evidence = z.infer<typeof evidenceSchema>;
+export type Decision = z.infer<typeof decisionSchema>;

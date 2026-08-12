@@ -4,5 +4,5 @@
     "lib": ["ES2024"],
     "tsBuildInfoFile": "../../node_modules/.cache/typescript/shared.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
