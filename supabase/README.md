@@ -15,6 +15,7 @@ A Docker-compatible container runtime is required for the local Supabase stack.
 ```sh
 pnpm db:start
 pnpm db:reset
+pnpm db:test
 pnpm db:lint
 pnpm db:stop
 ```
