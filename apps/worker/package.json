@@ -2,5 +2,14 @@
   "name": "@airux/worker",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev --test-scheduled",
+    "types": "wrangler types worker-configuration.d.ts",
+    "types:check": "wrangler types worker-configuration.d.ts --check"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0"
+  }
 }

@@ -514,11 +514,11 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
-| M1-1 | Project structure | Establish TypeScript packages for the Worker, web application, MCP client, and shared code. | Not Started | — |
-| M1-2 | Development tooling | Configure formatting, linting, type-checking, tests, and local commands. | Not Started | M1-1 |
-| M1-3 | Shared contracts | Define versioned schemas for capture plans, Reviews, Evidence, Decisions, states, and API errors. | Not Started | M1-1 |
-| M1-4 | Cloudflare skeleton | Deploy static assets, a health-check API route, and an empty scheduled handler. | Not Started | M1-1 |
-| M1-5 | Supabase foundation | Create isolated development and production resources and establish versioned migrations. | Not Started | M1-1 |
+| M1-1 | Project structure | Establish TypeScript packages for the Worker, web application, MCP client, and shared code. | Completed | — |
+| M1-2 | Development tooling | Configure formatting, linting, type-checking, tests, and local commands. | Completed | M1-1 |
+| M1-3 | Shared contracts | Define versioned schemas for capture plans, Reviews, Evidence, Decisions, states, and API errors. | Completed | M1-1 |
+| M1-4 | Cloudflare skeleton | Deploy static assets, a health-check API route, and an empty scheduled handler. | Completed | M1-1 |
+| M1-5 | Supabase foundation | Create isolated development and production resources and establish versioned migrations. | Completed | M1-1 |
 | M1-6 | Core database schema | Add the four application tables, relationships, indexes, and constraints. | Not Started | M1-3, M1-5 |
 | M1-7 | Configuration | Define typed environment configuration and store secrets outside source control. | Not Started | M1-4, M1-5 |
 
