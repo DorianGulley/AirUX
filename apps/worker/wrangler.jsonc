@@ -1,14 +1,40 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "airux-dev",
+  "name": "airux-local",
+  "account_id": "55806353e3c6044f3d7debc52135688e",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-08",
   "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "AIRUX_ENVIRONMENT": "local",
+    "AIRUX_APP_ORIGIN": "http://127.0.0.1:8787",
+    "SUPABASE_URL": "http://127.0.0.1:54321",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+    "CLOUDFLARE_ACCOUNT_ID": "55806353e3c6044f3d7debc52135688e"
+  },
+  "secrets": {
+    "required": ["SUPABASE_SECRET_KEY", "STREAM_API_TOKEN"]
+  },
   "assets": {
     "directory": "../web/public",
     "run_worker_first": ["/api/*"]
   },
   "triggers": {
     "crons": []
+  },
+  "env": {
+    "development": {
+      "name": "airux-dev",
+      "vars": {
+        "AIRUX_ENVIRONMENT": "development",
+        "AIRUX_APP_ORIGIN": "https://airux-dev.airux-platform.workers.dev",
+        "SUPABASE_URL": "https://rulojrgnyibmjgsgqlys.supabase.co",
+        "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h4BUC3IlHEvCwwxvBmEG3Q_UwQtQTeG",
+        "CLOUDFLARE_ACCOUNT_ID": "55806353e3c6044f3d7debc52135688e"
+      },
+      "secrets": {
+        "required": ["SUPABASE_SECRET_KEY", "STREAM_API_TOKEN"]
+      }
+    }
   }
 }

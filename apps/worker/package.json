@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env development --strict",
+    "deploy:dry-run": "wrangler deploy --env development --strict --dry-run",
     "dev": "wrangler dev --test-scheduled",
-    "types": "wrangler types worker-configuration.d.ts",
-    "types:check": "wrangler types worker-configuration.d.ts --check"
+    "types": "wrangler types worker-configuration.d.ts --strict-vars false",
+    "types:check": "wrangler types worker-configuration.d.ts --strict-vars false --check"
   },
   "devDependencies": {
     "@types/node": "26.2.0"
