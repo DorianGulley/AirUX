@@ -12,6 +12,14 @@ the reviewed migration history without carrying development data or settings.
 
 A Docker-compatible container runtime is required for the local Supabase stack.
 
+Create a GitHub OAuth app for local development with these exact URLs:
+
+- Homepage URL: `http://127.0.0.1:8787`
+- Authorization callback URL: `http://127.0.0.1:54321/auth/v1/callback`
+
+Copy `.env.example` to `.env` and add the OAuth app credentials before starting
+the local stack. The secret must remain outside source control.
+
 ```sh
 pnpm db:start
 pnpm db:reset
@@ -43,3 +51,7 @@ pnpm exec supabase db push
 
 Never commit access tokens, database passwords, service-role keys, or OAuth
 client secrets. Do not include seed data when pushing to a production project.
+
+The hosted development project needs a separate GitHub OAuth app whose callback
+URL is `https://rulojrgnyibmjgsgqlys.supabase.co/auth/v1/callback`. Configure the
+provider credentials and exact AirUX redirect URL in the Supabase dashboard.

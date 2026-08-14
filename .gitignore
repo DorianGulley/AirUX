@@ -1,4 +1,5 @@
 node_modules/
+apps/web/public/main.js
 .wrangler/
 .dev.vars
 .dev.vars.*

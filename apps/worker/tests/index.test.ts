@@ -34,6 +34,42 @@ describe("AirUX Worker", () => {
     });
   });
 
+  it("returns only public browser configuration", async () => {
+    const response = worker.fetch(
+      new Request("https://airux.app/api/v1/config"),
+      TEST_ENV,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const responseForSecretCheck = response.clone();
+    await expect(response.json()).resolves.toEqual({
+      supabase: {
+        url: TEST_ENV.SUPABASE_URL,
+        publishable_key: TEST_ENV.SUPABASE_PUBLISHABLE_KEY,
+      },
+    });
+    expect(await responseForSecretCheck.text()).not.toContain(
+      TEST_ENV.SUPABASE_SECRET_KEY,
+    );
+  });
+
+  it("rejects unsupported browser-configuration methods", async () => {
+    const response = worker.fetch(
+      new Request("https://airux.app/api/v1/config", { method: "POST" }),
+      TEST_ENV,
+    );
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("GET");
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "invalid_request",
+        message: "Method not allowed",
+      },
+    });
+  });
+
   it("returns the versioned API not-found response for unknown routes", async () => {
     const response = worker.fetch(
       new Request("https://airux.app/api/v1/unknown"),

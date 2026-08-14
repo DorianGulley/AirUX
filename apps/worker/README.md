@@ -11,6 +11,10 @@ The Worker uses generated `Env` bindings plus runtime validation in
 3. Replace both placeholders with local-only development credentials.
 4. Start the Worker with `pnpm worker:dev`.
 
+The Worker command builds the browser client before serving assets. Browser
+configuration is loaded from `GET /api/v1/config`; that response contains only
+the public Supabase URL and publishable key and is marked `no-store`.
+
 Wrangler reads `.dev.vars` only for local development. The file is ignored by
 Git. The Stream token is required for configuration validation even though the
 Stream integration is introduced in M4-3.
