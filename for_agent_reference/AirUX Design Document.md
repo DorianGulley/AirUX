@@ -520,7 +520,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M1-4 | Cloudflare skeleton | Deploy static assets, a health-check API route, and an empty scheduled handler. | Completed | M1-1 |
 | M1-5 | Supabase foundation | Create isolated development and production resources and establish versioned migrations. | Completed | M1-1 |
 | M1-6 | Core database schema | Add the four application tables, relationships, indexes, and constraints. | Completed | M1-3, M1-5 |
-| M1-7 | Configuration | Define typed environment configuration and store secrets outside source control. | Not Started | M1-4, M1-5 |
+| M1-7 | Configuration | Define typed environment configuration and store secrets outside source control. | Completed | M1-4, M1-5 |
 
 ### M2: Implement identity and access
 

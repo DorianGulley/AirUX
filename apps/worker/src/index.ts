@@ -1,3 +1,5 @@
+import { loadConfig } from "./config.js";
+
 const HEALTH_PATH = "/api/v1/health";
 
 const jsonHeaders = {
@@ -16,7 +18,21 @@ function jsonResponse(body: unknown, status = 200, headers?: HeadersInit) {
 }
 
 const worker = {
-  fetch(request: Request) {
+  fetch(request: Request, env: Env) {
+    try {
+      loadConfig(env);
+    } catch {
+      return jsonResponse(
+        {
+          error: {
+            code: "internal_error",
+            message: "Service unavailable",
+          },
+        },
+        503,
+      );
+    }
+
     const { pathname } = new URL(request.url);
 
     if (pathname === HEALTH_PATH) {
