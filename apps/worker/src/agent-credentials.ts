@@ -18,7 +18,7 @@ import type { AiruxConfig } from "./config.js";
 import type { AuthenticatedReviewer } from "./reviewer-auth.js";
 
 const DATA_RESPONSE_LIMIT = 1024 * 1024;
-const CREDENTIAL_COLUMNS = "id,name,created_at,last_used_at,revoked_at";
+const CREDENTIAL_COLUMNS = "id,user_id,name,created_at,last_used_at,revoked_at";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,7 +63,10 @@ function normalizeTimestamp(value: unknown) {
   return Number.isNaN(timestamp.getTime()) ? null : timestamp.toISOString();
 }
 
-function normalizeCredential(value: unknown): AgentCredential | null {
+function normalizeCredential(
+  value: unknown,
+  expectedUserId: string,
+): AgentCredential | null {
   if (typeof value !== "object" || value === null) {
     return null;
   }
@@ -77,6 +80,7 @@ function normalizeCredential(value: unknown): AgentCredential | null {
 
   if (
     typeof row.id !== "string" ||
+    row.user_id !== expectedUserId ||
     typeof row.name !== "string" ||
     createdAt === null ||
     (row.last_used_at !== null && lastUsedAt === null) ||
@@ -95,13 +99,15 @@ function normalizeCredential(value: unknown): AgentCredential | null {
   return result.success ? result.data : null;
 }
 
-async function readCredentialRows(response: Response) {
+async function readCredentialRows(response: Response, expectedUserId: string) {
   const body = await readJsonResponse(response, DATA_RESPONSE_LIMIT);
   if (!Array.isArray(body)) {
     throw new CredentialServiceError();
   }
 
-  const credentials = body.map(normalizeCredential);
+  const credentials = body.map((row) =>
+    normalizeCredential(row, expectedUserId),
+  );
   if (credentials.some((credential) => credential === null)) {
     throw new CredentialServiceError();
   }
@@ -142,7 +148,7 @@ async function createCredential(
     throw new CredentialServiceError();
   }
 
-  const rows = await readCredentialRows(response);
+  const rows = await readCredentialRows(response, reviewer.id);
   const credential = rows[0];
   if (
     rows.length !== 1 ||
@@ -181,7 +187,7 @@ async function listCredentials(
 
   return jsonResponse(
     listAgentCredentialsResponseSchema.parse({
-      credentials: await readCredentialRows(response),
+      credentials: await readCredentialRows(response, reviewer.id),
     }),
   );
 }
@@ -206,7 +212,7 @@ async function findCredential(
     throw new CredentialServiceError();
   }
 
-  const rows = await readCredentialRows(response);
+  const rows = await readCredentialRows(response, reviewer.id);
   const credential = rows[0];
   if (credential === undefined) {
     throw new CredentialNotFoundError();
@@ -242,7 +248,7 @@ async function revokeCredential(
     throw new CredentialServiceError();
   }
 
-  const rows = await readCredentialRows(response);
+  const rows = await readCredentialRows(response, reviewer.id);
   const credential = rows[0];
   const resolved =
     credential ??

@@ -36,8 +36,10 @@ POST /api/v1/agent-credentials/:id/revoke
 Creation returns the plaintext credential exactly once. The browser keeps it
 only in temporary DOM state, while the Worker stores only its SHA-256 digest.
 List and revoke operations always filter by the validated reviewer ID before
-using the Supabase Data API. Revocation is idempotent and retains the database
-record for audit history.
+using the Supabase Data API. Because the Worker secret bypasses RLS, the Worker
+also verifies that every returned credential row has that reviewer ID before
+omitting the internal owner field from the public response. Revocation is
+idempotent and retains the database record for audit history.
 
 Agent API routes use the same standard header with the versioned agent token:
 
