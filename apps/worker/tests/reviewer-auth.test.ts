@@ -46,7 +46,7 @@ describe("reviewer session validation", () => {
           apikey: TEST_ENV.SUPABASE_PUBLISHABLE_KEY,
           authorization: `Bearer ${TEST_TOKEN}`,
         },
-        redirect: "error",
+        redirect: "manual",
       },
     );
     expect(JSON.stringify(fetcher.mock.calls)).not.toContain(
@@ -122,6 +122,14 @@ describe("reviewer session validation", () => {
     [
       "provider error",
       async () => new Response("private detail", { status: 500 }),
+    ],
+    [
+      "provider redirect",
+      async () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://untrusted.example" },
+        }),
     ],
     ["network error", async () => Promise.reject(new Error("private detail"))],
     ["invalid JSON", async () => new Response("not JSON")],

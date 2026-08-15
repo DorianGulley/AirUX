@@ -1,8 +1,16 @@
+import {
+  handleAgentCredentialCollection,
+  handleAgentCredentialRevocation,
+} from "./agent-credentials.js";
 import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
+import { withAuthenticatedReviewer } from "./reviewer-auth.js";
 
 const HEALTH_PATH = "/api/v1/health";
 const CONFIG_PATH = "/api/v1/config";
+const AGENT_CREDENTIALS_PATH = "/api/v1/agent-credentials";
+const AGENT_CREDENTIAL_REVOKE_PATH =
+  /^\/api\/v1\/agent-credentials\/([^/]+)\/revoke$/;
 
 const worker = {
   fetch(request: Request, env: Env) {
@@ -61,6 +69,53 @@ const worker = {
           publishable_key: config.supabase.publishableKey,
         },
       });
+    }
+
+    if (pathname === AGENT_CREDENTIALS_PATH) {
+      if (request.method !== "GET" && request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "GET, POST" },
+        );
+      }
+
+      return withAuthenticatedReviewer(request, config, (reviewer) =>
+        handleAgentCredentialCollection(request, reviewer, config),
+      );
+    }
+
+    const revokeMatch = pathname.match(AGENT_CREDENTIAL_REVOKE_PATH);
+    if (revokeMatch !== null) {
+      if (request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "POST" },
+        );
+      }
+
+      const credentialId = revokeMatch[1];
+      if (credentialId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+
+      return withAuthenticatedReviewer(request, config, (reviewer) =>
+        handleAgentCredentialRevocation(credentialId, reviewer, config),
+      );
     }
 
     return jsonResponse(

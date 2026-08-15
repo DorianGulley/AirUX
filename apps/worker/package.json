@@ -10,6 +10,9 @@
     "types": "wrangler types worker-configuration.d.ts --strict-vars false",
     "types:check": "wrangler types worker-configuration.d.ts --strict-vars false --check"
   },
+  "dependencies": {
+    "@airux/shared": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "26.2.0"
   }

@@ -139,11 +139,14 @@ Timestamped comments, visual annotations, and discussion threads are post-MVP go
 
 ## 5. Open MVP Decisions
 
-The architecture is defined, but three product defaults still require validation:
+The architecture is defined, but two product defaults still require validation:
 
 1. **Capture policy.** Recording duration, default viewport, and the initial action vocabulary must keep evidence focused without blocking common demonstrations.
 2. **Retention policy.** The initial expiry and deletion periods must balance reviewer convenience, privacy, and storage cost.
-3. **Agent credential onboarding.** The MVP must choose a low-friction way for users to create, configure, and revoke agent credentials.
+
+Agent credential onboarding is resolved for the MVP: a signed-in reviewer uses
+the web credential manager to create, copy once, list, and revoke agent
+credentials.
 
 ---
 
@@ -275,6 +278,8 @@ Technical requirements:
 - The API validates the session and verifies that `review.user_id` matches the authenticated user.
 - Agents authenticate using revocable, high-entropy credentials associated with the same user.
 - Agent credentials are displayed once and stored only as hashes.
+- Agent credential tokens use `airux_agent_v1.<credential_uuid>.<base64url_secret>` with a 256-bit random secret.
+- The API stores a SHA-256 digest of the complete token and never stores or returns the plaintext after creation.
 - Agent credentials may create Reviews, poll their status, list Reviews they created, and cancel them.
 - Agent credentials cannot view private video or submit decisions.
 
@@ -443,6 +448,14 @@ Technical requirements:
 
 The Cloudflare Worker exposes a versioned API for agent operations, human review, and Stream callbacks.
 
+Reviewer credential endpoints:
+
+```text
+POST /api/v1/agent-credentials
+GET  /api/v1/agent-credentials
+POST /api/v1/agent-credentials/:id/revoke
+```
+
 Agent endpoints:
 
 ```text
@@ -530,7 +543,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 |---|---|---|---|---|
 | M2-1 | Reviewer sign-in | Implement GitHub OAuth and browser session handling through Supabase Auth. | Completed | M1-4, M1-5 |
 | M2-2 | Session validation | Validate reviewer sessions in the API Worker and expose the authenticated user. | Completed | M1-3, M2-1 |
-| M2-3 | Agent credential lifecycle | Create, display once, hash, list, and revoke agent credentials. | Not Started | M1-6, M2-2 |
+| M2-3 | Agent credential lifecycle | Create, display once, hash, list, and revoke agent credentials. | Completed | M1-6, M2-2 |
 | M2-4 | Agent authentication | Authenticate MCP requests and enforce credential permissions. | Not Started | M1-3, M2-3 |
 | M2-5 | Authorization tests | Verify reviewer ownership and agent credential isolation. | Not Started | M2-2, M2-4 |
 

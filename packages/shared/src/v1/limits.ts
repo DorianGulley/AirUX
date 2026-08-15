@@ -1,4 +1,5 @@
 export const CONTRACT_LIMITS = {
+  agentCredentialNameLength: 200,
   apiErrorMessageLength: 1_000,
   captureDurationMs: 120_000,
   captureStepCount: 100,
