@@ -104,6 +104,23 @@ describe("AirUX Worker", () => {
     expect(response.status).toBe(401);
   });
 
+  it("does not accept an agent credential on reviewer routes", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    const agentCredential =
+      "airux_agent_v1.dc0fb4f8-652b-4e12-8899-e12c34afbcde.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+    const response = await worker.fetch(
+      new Request("https://airux.app/api/v1/agent-credentials", {
+        headers: { authorization: `Bearer ${agentCredential}` },
+      }),
+      TEST_ENV,
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+  });
+
   it("passes the authenticated reviewer to credential listing", async () => {
     const reviewerId = "fa2a3aca-e4c6-40fe-bb92-e422f3350806";
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {

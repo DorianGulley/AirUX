@@ -39,6 +39,19 @@ List and revoke operations always filter by the validated reviewer ID before
 using the Supabase Data API. Revocation is idempotent and retains the database
 record for audit history.
 
+Agent API routes use the same standard header with the versioned agent token:
+
+```text
+Authorization: Bearer airux_agent_v1.<credential_uuid>.<secret>
+```
+
+The Worker extracts the credential UUID for an indexed lookup, excludes revoked
+records, hashes the complete presented token, and uses a timing-safe comparison
+against the stored digest. Successful authentication exposes only the
+credential ID and owning user ID to agent route handlers. Agent credentials are
+never accepted by reviewer routes, and authentication never returns the stored
+digest or provider details. `last_used_at` tracking is intentionally deferred.
+
 ## Managed development
 
 The `development` Wrangler environment explicitly deploys the existing
