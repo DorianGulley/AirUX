@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy --env development --strict",
-    "deploy:dry-run": "wrangler deploy --env development --strict --dry-run",
-    "dev": "wrangler dev --test-scheduled",
+    "deploy": "pnpm --filter @airux/web run build && wrangler deploy --env development --strict",
+    "deploy:dry-run": "pnpm --filter @airux/web run build && wrangler deploy --env development --strict --dry-run",
+    "dev": "pnpm --filter @airux/web run build && wrangler dev --test-scheduled",
     "types": "wrangler types worker-configuration.d.ts --strict-vars false",
     "types:check": "wrangler types worker-configuration.d.ts --strict-vars false --check"
   },

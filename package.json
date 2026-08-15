@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.16.0",
   "scripts": {
-    "check": "biome check . && pnpm worker:types:check && pnpm typecheck && pnpm test",
+    "check": "biome check . && pnpm worker:types:check && pnpm typecheck && pnpm test && pnpm web:build",
     "db:lint": "supabase db lint --local --level error --fail-on error",
     "db:migration:new": "supabase migration new",
     "db:reset": "supabase db reset --local",
@@ -18,6 +18,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",
     "typecheck": "tsc --build",
+    "web:build": "pnpm --filter @airux/web run build",
     "worker:deploy": "pnpm --filter @airux/worker run deploy",
     "worker:dev": "pnpm --filter @airux/worker run dev",
     "worker:types": "pnpm --filter @airux/worker run types",

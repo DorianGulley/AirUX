@@ -8,9 +8,32 @@
     <title>AirUX</title>
   </head>
   <body>
-    <main>
-      <h1>AirUX</h1>
-      <p>Agent Interaction Review UX</p>
+    <main class="auth-shell">
+      <section class="auth-card" aria-labelledby="page-title">
+        <p class="eyebrow">AirUX</p>
+        <h1 id="page-title">Review agent work with confidence.</h1>
+        <p class="intro">
+          Sign in to view private evidence and resolve reviews from any device.
+        </p>
+
+        <div class="auth-panel" data-auth-state="loading">
+          <p id="auth-status" class="auth-status" role="status" aria-live="polite">
+            Checking your session&hellip;
+          </p>
+          <p id="auth-identity" class="auth-identity" hidden></p>
+          <button id="sign-in" class="primary-action" type="button" hidden>
+            Continue with GitHub
+          </button>
+          <button id="sign-out" class="secondary-action" type="button" hidden>
+            Sign out
+          </button>
+        </div>
+
+        <p class="session-note">
+          Use a trusted device. Your sign-in is saved in this browser until you sign out.
+        </p>
+      </section>
     </main>
+    <script type="module" src="/main.js"></script>
   </body>
 </html>
