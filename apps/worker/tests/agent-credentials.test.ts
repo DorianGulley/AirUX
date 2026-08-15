@@ -11,10 +11,12 @@ import { TEST_ENV } from "./fixtures.js";
 const TEST_CONFIG = loadConfig(TEST_ENV);
 const REVIEWER = { id: "fa2a3aca-e4c6-40fe-bb92-e422f3350806" };
 const CREDENTIAL_ID = "dc0fb4f8-652b-4e12-8899-e12c34afbcde";
+const OTHER_REVIEWER_ID = "eb2d9347-652c-43ba-8e8c-81ac9a17d909";
 
 function credentialRow(overrides: Record<string, unknown> = {}) {
   return {
     id: CREDENTIAL_ID,
+    user_id: REVIEWER.id,
     name: "Codex on laptop",
     created_at: "2026-08-15T08:00:00+00:00",
     last_used_at: null,
@@ -80,6 +82,9 @@ describe("agent credential lifecycle", () => {
     const headers = new Headers(init?.headers);
     expect(url.origin).toBe("https://example.supabase.co");
     expect(url.pathname).toBe("/rest/v1/agent_credentials");
+    expect(url.searchParams.get("select")).toBe(
+      "id,user_id,name,created_at,last_used_at,revoked_at",
+    );
     expect(headers.get("apikey")).toBe(TEST_ENV.SUPABASE_SECRET_KEY);
     expect(headers.has("authorization")).toBe(false);
     expect(headers.get("prefer")).toBe("return=representation");
@@ -129,6 +134,31 @@ describe("agent credential lifecycle", () => {
         },
       ],
     });
+  });
+
+  it("fails closed if a credential response belongs to another reviewer", async () => {
+    const response = await handleAgentCredentialCollection(
+      new Request("https://airux.example/api/v1/agent-credentials"),
+      REVIEWER,
+      TEST_CONFIG,
+      vi.fn(async () =>
+        Response.json([
+          credentialRow({
+            user_id: OTHER_REVIEWER_ID,
+            name: "Private credential",
+          }),
+        ]),
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    const responseForLeakCheck = response.clone();
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "internal_error", message: "Service unavailable" },
+    });
+    expect(await responseForLeakCheck.text()).not.toContain(
+      "Private credential",
+    );
   });
 
   it("revokes once and returns the same record on a repeated request", async () => {

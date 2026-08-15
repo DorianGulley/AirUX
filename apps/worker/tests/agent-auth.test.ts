@@ -14,6 +14,9 @@ const TEST_CONFIG = loadConfig(TEST_ENV);
 const CREDENTIAL_ID = "dc0fb4f8-652b-4e12-8899-e12c34afbcde";
 const USER_ID = "fa2a3aca-e4c6-40fe-bb92-e422f3350806";
 const TOKEN = `airux_agent_v1.${CREDENTIAL_ID}.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
+const OTHER_CREDENTIAL_ID = "eb2d9347-652c-43ba-8e8c-81ac9a17d909";
+const OTHER_USER_ID = "80d9eb26-8495-4f07-9ad1-88c36829ff75";
+const OTHER_TOKEN = `airux_agent_v1.${OTHER_CREDENTIAL_ID}.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB`;
 
 function agentRequest(authorization?: string) {
   return new Request("https://airux.example/api/v1/agent/reviews", {
@@ -36,13 +39,17 @@ function removeTimingSafeEqual() {
   Reflect.deleteProperty(crypto.subtle, "timingSafeEqual");
 }
 
-async function credentialResponse(secretHash?: string) {
+async function credentialResponse(
+  secretHash?: string,
+  credentialId = CREDENTIAL_ID,
+  userId = USER_ID,
+) {
   const resolvedSecretHash =
     secretHash ?? (await hashAgentCredentialToken(TOKEN));
   return Response.json([
     {
-      id: CREDENTIAL_ID,
-      user_id: USER_ID,
+      id: credentialId,
+      user_id: userId,
       secret_hash: resolvedSecretHash,
     },
   ]);
@@ -163,6 +170,55 @@ describe("agent authentication", () => {
     await expect(response.json()).resolves.toEqual({
       credentialId: CREDENTIAL_ID,
       userId: USER_ID,
+    });
+  });
+
+  it("does not let one credential secret authenticate as another credential", async () => {
+    const otherSecretHash = await hashAgentCredentialToken(OTHER_TOKEN);
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const id = new URL(String(input)).searchParams
+        .get("id")
+        ?.replace(/^eq\./, "");
+      if (id === CREDENTIAL_ID) {
+        return credentialResponse();
+      }
+      if (id === OTHER_CREDENTIAL_ID) {
+        return credentialResponse(
+          otherSecretHash,
+          OTHER_CREDENTIAL_ID,
+          OTHER_USER_ID,
+        );
+      }
+      return Response.json([]);
+    });
+
+    await expect(
+      authenticateAgent(
+        agentRequest(`Bearer ${OTHER_TOKEN}`),
+        TEST_CONFIG,
+        fetcher,
+      ),
+    ).resolves.toEqual({
+      credentialId: OTHER_CREDENTIAL_ID,
+      userId: OTHER_USER_ID,
+    });
+
+    const splicedToken = `airux_agent_v1.${CREDENTIAL_ID}.BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB`;
+    const handler = vi.fn(() => new Response());
+    const response = await withAuthenticatedAgent(
+      agentRequest(`Bearer ${splicedToken}`),
+      TEST_CONFIG,
+      handler,
+      fetcher,
+    );
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "authentication_required",
+        message: "Authentication required",
+      },
     });
   });
 
