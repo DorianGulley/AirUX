@@ -529,7 +529,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
 | M2-1 | Reviewer sign-in | Implement GitHub OAuth and browser session handling through Supabase Auth. | Completed | M1-4, M1-5 |
-| M2-2 | Session validation | Validate reviewer sessions in the API Worker and expose the authenticated user. | Not Started | M1-3, M2-1 |
+| M2-2 | Session validation | Validate reviewer sessions in the API Worker and expose the authenticated user. | Completed | M1-3, M2-1 |
 | M2-3 | Agent credential lifecycle | Create, display once, hash, list, and revoke agent credentials. | Not Started | M1-6, M2-2 |
 | M2-4 | Agent authentication | Authenticate MCP requests and enforce credential permissions. | Not Started | M1-3, M2-3 |
 | M2-5 | Authorization tests | Verify reviewer ownership and agent credential isolation. | Not Started | M2-2, M2-4 |
