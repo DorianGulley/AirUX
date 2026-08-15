@@ -63,6 +63,10 @@ describe("reviewer session validation", () => {
     ["missing token", "Bearer"],
     ["multiple values", `Bearer ${TEST_TOKEN}, Bearer ${TEST_TOKEN}`],
     ["not a JWT", "Bearer opaque-token"],
+    [
+      "agent credential",
+      "Bearer airux_agent_v1.dc0fb4f8-652b-4e12-8899-e12c34afbcde.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    ],
     ["oversized", `Bearer header.${"a".repeat(8_192)}.signature`],
   ])(
     "rejects a %s authorization header without calling Supabase",

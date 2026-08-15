@@ -1,3 +1,5 @@
+import { agentCredentialTokenSchema } from "@airux/shared/v1";
+
 import { jsonResponse } from "./api-response.js";
 import type { AiruxConfig } from "./config.js";
 
@@ -30,7 +32,8 @@ function readAccessToken(request: Request) {
   if (
     token === undefined ||
     token.length > ACCESS_TOKEN_MAX_LENGTH ||
-    !ACCESS_TOKEN_PATTERN.test(token)
+    !ACCESS_TOKEN_PATTERN.test(token) ||
+    agentCredentialTokenSchema.safeParse(token).success
   ) {
     throw new AuthenticationRequiredError();
   }

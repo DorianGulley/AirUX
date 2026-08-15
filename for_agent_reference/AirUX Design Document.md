@@ -280,6 +280,10 @@ Technical requirements:
 - Agent credentials are displayed once and stored only as hashes.
 - Agent credential tokens use `airux_agent_v1.<credential_uuid>.<base64url_secret>` with a 256-bit random secret.
 - The API stores a SHA-256 digest of the complete token and never stores or returns the plaintext after creation.
+- Agent API requests send the credential using the standard `Authorization: Bearer <token>` header.
+- The Worker uses the embedded credential UUID for an indexed lookup, excludes revoked records, and compares the complete-token digest using a timing-safe operation.
+- Successful agent authentication exposes only the credential ID and owning user ID to agent route handlers; fixed route boundaries provide the MVP permissions without stored scopes.
+- Updating `last_used_at` is deferred until usage tracking is required independently of authentication.
 - Agent credentials may create Reviews, poll their status, list Reviews they created, and cancel them.
 - Agent credentials cannot view private video or submit decisions.
 
@@ -544,7 +548,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M2-1 | Reviewer sign-in | Implement GitHub OAuth and browser session handling through Supabase Auth. | Completed | M1-4, M1-5 |
 | M2-2 | Session validation | Validate reviewer sessions in the API Worker and expose the authenticated user. | Completed | M1-3, M2-1 |
 | M2-3 | Agent credential lifecycle | Create, display once, hash, list, and revoke agent credentials. | Completed | M1-6, M2-2 |
-| M2-4 | Agent authentication | Authenticate MCP requests and enforce credential permissions. | Not Started | M1-3, M2-3 |
+| M2-4 | Agent authentication | Authenticate MCP requests and enforce credential permissions. | Completed | M1-3, M2-3 |
 | M2-5 | Authorization tests | Verify reviewer ownership and agent credential isolation. | Not Started | M2-2, M2-4 |
 
 ### M3: Implement the Review domain
