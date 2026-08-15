@@ -26,6 +26,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@airux/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@supabase/supabase-js':
         specifier: 2.112.3
         version: 2.112.3
@@ -35,6 +38,10 @@ importers:
         version: 0.28.2
 
   apps/worker:
+    dependencies:
+      '@airux/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
     devDependencies:
       '@types/node':
         specifier: 26.2.0

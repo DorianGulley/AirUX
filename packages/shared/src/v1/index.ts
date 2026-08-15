@@ -1,5 +1,6 @@
 export const CONTRACT_VERSION = "v1" as const;
 
+export * from "./agent-credential.js";
 export * from "./api-error.js";
 export * from "./capture.js";
 export * from "./limits.js";

@@ -53,7 +53,7 @@ async function requestAuthenticatedReviewer(
         apikey: config.supabase.publishableKey,
         authorization: `Bearer ${token}`,
       },
-      redirect: "error",
+      redirect: "manual",
     });
   } catch {
     throw new AuthenticationServiceError();

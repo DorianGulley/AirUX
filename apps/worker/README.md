@@ -25,6 +25,20 @@ Supabase Auth for every protected request and passes only the authenticated
 user ID to the route handler. Access tokens and provider error bodies must not
 be logged or returned to clients.
 
+Signed-in reviewers manage agent credentials through:
+
+```text
+POST /api/v1/agent-credentials
+GET  /api/v1/agent-credentials
+POST /api/v1/agent-credentials/:id/revoke
+```
+
+Creation returns the plaintext credential exactly once. The browser keeps it
+only in temporary DOM state, while the Worker stores only its SHA-256 digest.
+List and revoke operations always filter by the validated reviewer ID before
+using the Supabase Data API. Revocation is idempotent and retains the database
+record for audit history.
+
 ## Managed development
 
 The `development` Wrangler environment explicitly deploys the existing
