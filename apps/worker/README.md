@@ -19,6 +19,12 @@ Wrangler reads `.dev.vars` only for local development. The file is ignored by
 Git. The Stream token is required for configuration validation even though the
 Stream integration is introduced in M4-3.
 
+Protected reviewer routes use the browser's Supabase access token from the
+`Authorization: Bearer <token>` header. The Worker validates the token with
+Supabase Auth for every protected request and passes only the authenticated
+user ID to the route handler. Access tokens and provider error bodies must not
+be logged or returned to clients.
+
 ## Managed development
 
 The `development` Wrangler environment explicitly deploys the existing

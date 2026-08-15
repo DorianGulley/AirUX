@@ -1,22 +1,8 @@
+import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
 
 const HEALTH_PATH = "/api/v1/health";
 const CONFIG_PATH = "/api/v1/config";
-
-const jsonHeaders = {
-  "cache-control": "no-store",
-  "content-type": "application/json; charset=utf-8",
-};
-
-function jsonResponse(body: unknown, status = 200, headers?: HeadersInit) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...jsonHeaders,
-      ...headers,
-    },
-  });
-}
 
 const worker = {
   fetch(request: Request, env: Env) {
