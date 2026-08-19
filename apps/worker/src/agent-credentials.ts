@@ -18,7 +18,10 @@ import type { AiruxConfig } from "./config.js";
 import type { AuthenticatedReviewer } from "./reviewer-auth.js";
 
 const DATA_RESPONSE_LIMIT = 1024 * 1024;
+const DATA_ERROR_RESPONSE_LIMIT = 16 * 1024;
 const CREDENTIAL_COLUMNS = "id,user_id,name,created_at,last_used_at,revoked_at";
+const CREDENTIAL_QUOTA_ERROR_CODE = "P0001";
+const CREDENTIAL_QUOTA_ERROR_MESSAGE = "active agent credential quota exceeded";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,6 +31,7 @@ type Fetcher = (
 ) => Promise<Response>;
 
 class CredentialNotFoundError extends Error {}
+class CredentialQuotaExceededError extends Error {}
 class CredentialServiceError extends Error {}
 
 function dataApiUrl(config: AiruxConfig) {
@@ -52,6 +56,24 @@ async function fetchData(url: URL, init: RequestInit, fetcher: Fetcher) {
   } catch {
     throw new CredentialServiceError();
   }
+}
+
+async function isCredentialQuotaError(response: Response) {
+  let body: unknown;
+  try {
+    body = await readJsonResponse(response, DATA_ERROR_RESPONSE_LIMIT);
+  } catch {
+    return false;
+  }
+
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "code" in body &&
+    body.code === CREDENTIAL_QUOTA_ERROR_CODE &&
+    "message" in body &&
+    body.message === CREDENTIAL_QUOTA_ERROR_MESSAGE
+  );
 }
 
 function normalizeTimestamp(value: unknown) {
@@ -145,6 +167,9 @@ async function createCredential(
     fetcher,
   );
   if (!response.ok) {
+    if (await isCredentialQuotaError(response)) {
+      throw new CredentialQuotaExceededError();
+    }
     throw new CredentialServiceError();
   }
 
@@ -269,6 +294,17 @@ function errorResponse(error: unknown) {
     return jsonResponse(
       { error: { code: "not_found", message: "Not found" } },
       404,
+    );
+  }
+  if (error instanceof CredentialQuotaExceededError) {
+    return jsonResponse(
+      {
+        error: {
+          code: "rate_limited",
+          message: "Active credential limit reached",
+        },
+      },
+      429,
     );
   }
   return jsonResponse(

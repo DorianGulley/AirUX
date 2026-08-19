@@ -21,9 +21,17 @@ Stream integration is introduced in M4-3.
 
 Protected reviewer routes use the browser's Supabase access token from the
 `Authorization: Bearer <token>` header. The Worker validates the token with
-Supabase Auth for every protected request and passes only the authenticated
-user ID to the route handler. Access tokens and provider error bodies must not
-be logged or returned to clients.
+Supabase Auth for every protected request, requires GitHub as the trusted auth
+provider, and passes only the authenticated user ID to the route handler.
+Access tokens and provider error bodies must not be logged or returned to
+clients.
+
+Credential endpoints are protected by two Cloudflare rate-limit bindings.
+Authentication attempts are limited to 120 requests per minute per source IP,
+and credential creation is additionally limited to 10 requests per minute per
+reviewer. Limiter failures fail closed. The database independently caps each
+reviewer at 20 active credentials; revoking one frees a slot while retaining
+the revoked record for audit history.
 
 Signed-in reviewers manage agent credentials through:
 

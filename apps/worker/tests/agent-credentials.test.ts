@@ -247,6 +247,34 @@ describe("agent credential lifecycle", () => {
     },
   );
 
+  it("returns a generic rate-limit response when the active credential quota is reached", async () => {
+    const response = await handleAgentCredentialCollection(
+      createRequest({ name: "One credential too many" }),
+      REVIEWER,
+      TEST_CONFIG,
+      vi.fn(async () =>
+        Response.json(
+          {
+            code: "P0001",
+            details: null,
+            hint: null,
+            message: "active agent credential quota exceeded",
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Active credential limit reached",
+      },
+    });
+  });
+
   it("fails closed without returning Data API details", async () => {
     const response = await handleAgentCredentialCollection(
       new Request("https://airux.example/api/v1/agent-credentials"),

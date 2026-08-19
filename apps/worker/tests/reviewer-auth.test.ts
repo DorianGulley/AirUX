@@ -18,6 +18,7 @@ function validUserResponse() {
   return Response.json({
     id: TEST_REVIEWER_ID,
     email: "private@example.com",
+    app_metadata: { provider: "github", providers: ["github"] },
     user_metadata: { user_name: "private-profile" },
   });
 }
@@ -122,6 +123,30 @@ describe("reviewer session validation", () => {
     },
   );
 
+  it("rejects a valid Supabase session that did not originate from GitHub", async () => {
+    const handler = vi.fn(() => new Response());
+    const response = await withAuthenticatedReviewer(
+      reviewerRequest(`Bearer ${TEST_TOKEN}`),
+      TEST_CONFIG,
+      handler,
+      vi.fn(async () =>
+        Response.json({
+          id: TEST_REVIEWER_ID,
+          app_metadata: { provider: "email", providers: ["email"] },
+        }),
+      ),
+    );
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "authentication_required",
+        message: "Authentication required",
+      },
+    });
+  });
+
   it.each([
     [
       "provider error",
@@ -138,6 +163,15 @@ describe("reviewer session validation", () => {
     ["network error", async () => Promise.reject(new Error("private detail"))],
     ["invalid JSON", async () => new Response("not JSON")],
     ["invalid user", async () => Response.json({ id: "not-a-uuid" })],
+    [
+      "oversized user record",
+      async () =>
+        Response.json({
+          id: TEST_REVIEWER_ID,
+          app_metadata: { provider: "github", providers: ["github"] },
+          user_metadata: { padding: "x".repeat(20_000) },
+        }),
+    ],
   ])("fails closed for a %s", async (_name, fetcher) => {
     const handler = vi.fn(() => new Response());
     const response = await withAuthenticatedReviewer(

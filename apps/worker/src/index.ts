@@ -11,6 +11,57 @@ const CONFIG_PATH = "/api/v1/config";
 const AGENT_CREDENTIALS_PATH = "/api/v1/agent-credentials";
 const AGENT_CREDENTIAL_REVOKE_PATH =
   /^\/api\/v1\/agent-credentials\/([^/]+)\/revoke$/;
+const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
+
+function rateLimitErrorResponse(status: 429 | 503) {
+  if (status === 429) {
+    return jsonResponse(
+      {
+        error: {
+          code: "rate_limited",
+          message: "Too many requests",
+        },
+      },
+      status,
+      { "retry-after": String(RATE_LIMIT_RETRY_AFTER_SECONDS) },
+    );
+  }
+
+  return jsonResponse(
+    {
+      error: {
+        code: "internal_error",
+        message: "Service unavailable",
+      },
+    },
+    status,
+  );
+}
+
+async function enforceRateLimit(limiter: RateLimit, key: string) {
+  try {
+    const { success } = await limiter.limit({ key });
+    return success ? null : rateLimitErrorResponse(429);
+  } catch {
+    return rateLimitErrorResponse(503);
+  }
+}
+
+function reviewerRequestRateLimitKey(request: Request) {
+  return `reviewer-ip:${request.headers.get("cf-connecting-ip") ?? "unknown"}`;
+}
+
+async function withReviewerRequestRateLimit(
+  request: Request,
+  env: Env,
+  handler: () => Response | Promise<Response>,
+) {
+  const response = await enforceRateLimit(
+    env.REVIEWER_AUTH_RATE_LIMITER,
+    reviewerRequestRateLimitKey(request),
+  );
+  return response ?? handler();
+}
 
 const worker = {
   fetch(request: Request, env: Env) {
@@ -85,8 +136,20 @@ const worker = {
         );
       }
 
-      return withAuthenticatedReviewer(request, config, (reviewer) =>
-        handleAgentCredentialCollection(request, reviewer, config),
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, async (reviewer) => {
+          if (request.method === "POST") {
+            const response = await enforceRateLimit(
+              env.CREDENTIAL_CREATE_RATE_LIMITER,
+              `reviewer:${reviewer.id}`,
+            );
+            if (response !== null) {
+              return response;
+            }
+          }
+
+          return handleAgentCredentialCollection(request, reviewer, config);
+        }),
       );
     }
 
@@ -113,8 +176,10 @@ const worker = {
         );
       }
 
-      return withAuthenticatedReviewer(request, config, (reviewer) =>
-        handleAgentCredentialRevocation(credentialId, reviewer, config),
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, (reviewer) =>
+          handleAgentCredentialRevocation(credentialId, reviewer, config),
+        ),
       );
     }
 

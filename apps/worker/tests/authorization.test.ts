@@ -47,10 +47,16 @@ function installAuthorizationBackend() {
       if (url.pathname === "/auth/v1/user") {
         const authorization = new Headers(init?.headers).get("authorization");
         if (authorization === `Bearer ${REVIEWER_A_TOKEN}`) {
-          return Response.json({ id: REVIEWER_A_ID });
+          return Response.json({
+            id: REVIEWER_A_ID,
+            app_metadata: { provider: "github", providers: ["github"] },
+          });
         }
         if (authorization === `Bearer ${REVIEWER_B_TOKEN}`) {
-          return Response.json({ id: REVIEWER_B_ID });
+          return Response.json({
+            id: REVIEWER_B_ID,
+            app_metadata: { provider: "github", providers: ["github"] },
+          });
         }
         return new Response(null, { status: 401 });
       }
