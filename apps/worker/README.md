@@ -62,6 +62,15 @@ credential ID and owning user ID to agent route handlers. Agent credentials are
 never accepted by reviewer routes, and authentication never returns the stored
 digest or provider details. `last_used_at` tracking is intentionally deferred.
 
+## Review lifecycle service
+
+Review and Evidence state changes use `src/state-transitions.ts`, which calls
+the Postgres transition functions through the bounded Supabase Data API client.
+The functions compare expected state atomically, return no row for stale state
+or version expectations, preserve same-state retries as no-ops, and maintain
+Review versions and lifecycle timestamps. Database triggers also reject invalid
+direct state updates.
+
 ## Managed development
 
 The `development` Wrangler environment explicitly deploys the existing

@@ -404,6 +404,17 @@ Technical requirements:
 - Only a `pending` Review may transition to a human decision.
 - Provider URLs are not stored; only the Stream video identifier is persisted.
 - Review identifiers are cryptographically random and non-sequential.
+- Review transitions are `draft` to `pending`, `cancelled`, or `expired`, and
+  `pending` to `approved`, `changes_requested`, `cancelled`, or `expired`.
+- Evidence transitions are `awaiting_upload` to `processing`, `failed`, or
+  `deleting`; `processing` to `ready`, `failed`, or `deleting`; `ready` or
+  `failed` to `deleting`; and `deleting` to `deleted`.
+- Repeating the current state is an idempotent no-op; terminal states have no
+  outgoing transitions.
+- Postgres functions atomically compare the expected state, apply lifecycle
+  timestamps, and increment the Review version. Database triggers reject
+  invalid direct state updates, and a Review cannot become `pending` before its
+  Evidence is `ready`.
 
 ### 6.8 Agent Result Delivery
 
@@ -559,7 +570,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
-| M3-1 | State-transition service | Implement and test allowed Review and Evidence lifecycle transitions. | Not Started | M1-3, M1-6 |
+| M3-1 | State-transition service | Implement and test allowed Review and Evidence lifecycle transitions. | Completed | M1-3, M1-6 |
 | M3-2 | Agent Review API | Implement create, get, list-open, and cancel endpoints with creation idempotency. | Not Started | M2-4, M3-1 |
 | M3-3 | Reviewer API | Implement authorized Review retrieval and transactional, version-checked decisions. | Not Started | M2-2, M3-1 |
 | M3-4 | API contract tests | Verify validation, authorization, idempotency, and conflicting-decision behavior. | Not Started | M3-2, M3-3 |
