@@ -104,6 +104,16 @@ or version expectations, preserve same-state retries as no-ops, and maintain
 Review versions and lifecycle timestamps. Database triggers also reject invalid
 direct state updates.
 
+## Review API contract coverage
+
+The Worker contract suite drives the public agent and reviewer routes through
+routing, authentication, shared-schema validation, and a stateful backend
+fixture. It verifies owner and credential isolation, equivalent missing and
+unauthorized Review responses, creation and cancellation idempotency, payload
+reuse conflicts, and single-winner version-checked Decisions. Handler and
+database suites continue to test provider failures and transactional invariants
+at their narrower boundaries.
+
 ## Managed development
 
 The `development` Wrangler environment explicitly deploys the existing

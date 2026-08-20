@@ -588,7 +588,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M3-1 | State-transition service | Implement and test allowed Review and Evidence lifecycle transitions. | Completed | M1-3, M1-6 |
 | M3-2 | Agent Review API | Implement create, get, list-open, and cancel endpoints with creation idempotency. | Completed | M2-4, M3-1 |
 | M3-3 | Reviewer API | Implement authorized Review retrieval and transactional, version-checked decisions. | Completed | M2-2, M3-1 |
-| M3-4 | API contract tests | Verify validation, authorization, idempotency, and conflicting-decision behavior. | Not Started | M3-2, M3-3 |
+| M3-4 | API contract tests | Verify validation, authorization, idempotency, and conflicting-decision behavior. | Completed | M3-2, M3-3 |
 
 ### M4: Capture and upload evidence
 
