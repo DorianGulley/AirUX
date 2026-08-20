@@ -181,6 +181,54 @@ export const listOpenAgentReviewsResponseSchema = z
 
 export const cancelAgentReviewResponseSchema = getAgentReviewResponseSchema;
 
+export const reviewerReviewEvidenceSchema = z
+  .object({
+    id: identifierSchema,
+    kind: evidenceKindSchema,
+    status: evidenceStateSchema,
+    media_type: z
+      .string()
+      .regex(/^video\/[a-z0-9][a-z0-9.+-]*$/i, "Expected a video media type"),
+    size_bytes: positiveIntegerSchema.max(CONTRACT_LIMITS.mediaSizeBytes),
+    duration_ms: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.captureDurationMs)
+      .nullable(),
+    width: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.viewportWidth.max)
+      .nullable(),
+    height: positiveIntegerSchema
+      .max(CONTRACT_LIMITS.viewportHeight.max)
+      .nullable(),
+    failure_code: z.string().trim().min(1).max(128).nullable(),
+  })
+  .strict();
+
+export const reviewerReviewDecisionSchema = agentReviewDecisionSchema;
+
+export const reviewerReviewSchema = z
+  .object({
+    id: identifierSchema,
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    claim: z.string().trim().min(1).max(CONTRACT_LIMITS.claimLength),
+    criteria: reviewCriteriaSchema,
+    status: reviewStateSchema,
+    version: nonNegativeIntegerSchema,
+    created_at: utcTimestampSchema,
+    submitted_at: utcTimestampSchema.nullable(),
+    expires_at: utcTimestampSchema,
+    resolved_at: utcTimestampSchema.nullable(),
+    evidence: reviewerReviewEvidenceSchema,
+    decision: reviewerReviewDecisionSchema.nullable(),
+  })
+  .strict();
+
+export const getReviewerReviewResponseSchema = z
+  .object({ review: reviewerReviewSchema })
+  .strict();
+
+export const decideReviewerReviewResponseSchema =
+  getReviewerReviewResponseSchema;
+
 export const decisionRequestSchema = z
   .object({
     expected_version: nonNegativeIntegerSchema,
@@ -303,6 +351,19 @@ export type ListOpenAgentReviewsResponse = z.infer<
 >;
 export type CancelAgentReviewResponse = z.infer<
   typeof cancelAgentReviewResponseSchema
+>;
+export type ReviewerReviewEvidence = z.infer<
+  typeof reviewerReviewEvidenceSchema
+>;
+export type ReviewerReviewDecision = z.infer<
+  typeof reviewerReviewDecisionSchema
+>;
+export type ReviewerReview = z.infer<typeof reviewerReviewSchema>;
+export type GetReviewerReviewResponse = z.infer<
+  typeof getReviewerReviewResponseSchema
+>;
+export type DecideReviewerReviewResponse = z.infer<
+  typeof decideReviewerReviewResponseSchema
 >;
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
 export type Review = z.infer<typeof reviewSchema>;

@@ -295,6 +295,45 @@ describe("AirUX Worker", () => {
     expect(cancellation.headers.get("allow")).toBe("POST");
   });
 
+  it("requires a reviewer session for reviewer Review routes", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+
+    for (const request of [
+      new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`),
+      new Request(
+        `https://airux.app/api/v1/reviews/${CREDENTIAL_ID}/decision`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ expected_version: 1, outcome: "approved" }),
+        },
+      ),
+    ]) {
+      const response = await worker.fetch(request, TEST_ENV);
+      expect(response.status).toBe(401);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("advertises reviewer Review methods before authentication", () => {
+    const detail = worker.fetch(
+      new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`, {
+        method: "POST",
+      }),
+      TEST_ENV,
+    );
+    expect(detail.status).toBe(405);
+    expect(detail.headers.get("allow")).toBe("GET");
+
+    const decision = worker.fetch(
+      new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}/decision`),
+      TEST_ENV,
+    );
+    expect(decision.status).toBe(405);
+    expect(decision.headers.get("allow")).toBe("POST");
+  });
+
   it("provides a no-op scheduled handler", () => {
     expect(worker.scheduled()).toBeUndefined();
   });

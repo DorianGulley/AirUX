@@ -11,6 +11,7 @@ import {
   EVIDENCE_STATES,
   evidenceSchema,
   evidenceStateSchema,
+  getReviewerReviewResponseSchema,
   REVIEW_STATES,
   reviewSchema,
   reviewStateSchema,
@@ -224,6 +225,41 @@ describe("Review and Evidence resources", () => {
     expect(parsed).not.toHaveProperty("user_id");
     expect(parsed.evidence).not.toHaveProperty("stream_video_id");
     expect(parsed.evidence).not.toHaveProperty("delete_after");
+  });
+
+  it("defines an owner-safe reviewer response with presentation metadata", () => {
+    const parsed = getReviewerReviewResponseSchema.parse({
+      review: {
+        id: "rvw_1",
+        title: validCreateRequest.title,
+        claim: validCreateRequest.claim,
+        criteria: validCreateRequest.criteria,
+        status: "pending",
+        version: 1,
+        created_at: "2026-08-12T01:00:00Z",
+        submitted_at: "2026-08-12T01:01:00Z",
+        expires_at: "2026-08-15T01:01:00Z",
+        resolved_at: null,
+        evidence: {
+          id: "evd_1",
+          kind: "browser_video",
+          status: "ready",
+          media_type: "video/webm",
+          size_bytes: 1_024,
+          duration_ms: 15_000,
+          width: 1_280,
+          height: 720,
+          failure_code: null,
+        },
+        decision: null,
+      },
+    });
+
+    expect(parsed.review.evidence.width).toBe(1_280);
+    expect(parsed.review).not.toHaveProperty("user_id");
+    expect(parsed.review).not.toHaveProperty("agent_credential_id");
+    expect(parsed.review.evidence).not.toHaveProperty("stream_video_id");
+    expect(parsed.review.evidence).not.toHaveProperty("delete_after");
   });
 });
 
