@@ -2,7 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2024"],
-    "tsBuildInfoFile": "../../node_modules/.cache/typescript/mcp.tsbuildinfo"
+    "tsBuildInfoFile": "../../node_modules/.cache/typescript/mcp.tsbuildinfo",
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

@@ -596,7 +596,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
-| M4-1 | Capture-plan runner | Validate and execute the constrained Playwright action vocabulary. | Not Started | M1-3 |
+| M4-1 | Capture-plan runner | Validate and execute the constrained Playwright action vocabulary. | Completed | M1-3 |
 | M4-2 | Browser recording | Record an isolated session with host, viewport, duration, and timeout limits. | Not Started | M4-1 |
 | M4-3 | Stream upload integration | Request one-time private upload URLs from Cloudflare Stream. | Completed | M1-7, M3-1 |
 | M4-4 | Stream webhook | Verify processing webhooks and update Evidence and Review states. | Not Started | M3-1, M4-3 |

@@ -2,5 +2,12 @@
   "name": "@airux/mcp",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@airux/shared": "workspace:*",
+    "playwright": "1.62.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0"
+  }
 }
