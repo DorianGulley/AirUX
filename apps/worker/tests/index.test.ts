@@ -248,6 +248,53 @@ describe("AirUX Worker", () => {
     expect(revocation.headers.get("allow")).toBe("POST");
   });
 
+  it("requires an agent credential for Review routes", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+
+    for (const request of [
+      new Request("https://airux.app/api/v1/agent/reviews"),
+      new Request(`https://airux.app/api/v1/agent/reviews/${CREDENTIAL_ID}`),
+      new Request(
+        `https://airux.app/api/v1/agent/reviews/${CREDENTIAL_ID}/cancel`,
+        { method: "POST" },
+      ),
+    ]) {
+      const response = await worker.fetch(request, TEST_ENV);
+      expect(response.status).toBe(401);
+    }
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("advertises agent Review methods before authentication", () => {
+    const collection = worker.fetch(
+      new Request("https://airux.app/api/v1/agent/reviews", {
+        method: "DELETE",
+      }),
+      TEST_ENV,
+    );
+    expect(collection.status).toBe(405);
+    expect(collection.headers.get("allow")).toBe("GET, POST");
+
+    const detail = worker.fetch(
+      new Request(`https://airux.app/api/v1/agent/reviews/${CREDENTIAL_ID}`, {
+        method: "POST",
+      }),
+      TEST_ENV,
+    );
+    expect(detail.status).toBe(405);
+    expect(detail.headers.get("allow")).toBe("GET");
+
+    const cancellation = worker.fetch(
+      new Request(
+        `https://airux.app/api/v1/agent/reviews/${CREDENTIAL_ID}/cancel`,
+      ),
+      TEST_ENV,
+    );
+    expect(cancellation.status).toBe(405);
+    expect(cancellation.headers.get("allow")).toBe("POST");
+  });
+
   it("provides a no-op scheduled handler", () => {
     expect(worker.scheduled()).toBeUndefined();
   });
@@ -255,7 +302,7 @@ describe("AirUX Worker", () => {
   it("fails closed without exposing invalid configuration", async () => {
     const response = worker.fetch(
       new Request("https://airux.app/api/v1/health"),
-      { ...TEST_ENV, STREAM_API_TOKEN: "" },
+      { ...TEST_ENV, SUPABASE_SECRET_KEY: "" },
     );
 
     expect(response.status).toBe(503);

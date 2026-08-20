@@ -9,8 +9,6 @@ type ConfigurationBindings = Pick<
   | "SUPABASE_URL"
   | "SUPABASE_PUBLISHABLE_KEY"
   | "SUPABASE_SECRET_KEY"
-  | "CLOUDFLARE_ACCOUNT_ID"
-  | "STREAM_API_TOKEN"
 >;
 
 export interface AiruxConfig {
@@ -20,10 +18,6 @@ export interface AiruxConfig {
     readonly url: string;
     readonly publishableKey: string;
     readonly secretKey: string;
-  };
-  readonly stream: {
-    readonly accountId: string;
-    readonly apiToken: string;
   };
 }
 
@@ -91,26 +85,6 @@ function requirePrefix(
   return value;
 }
 
-function requireAccountId(value: string) {
-  if (typeof value !== "string" || !/^[a-f0-9]{32}$/.test(value)) {
-    throw new ConfigurationError("CLOUDFLARE_ACCOUNT_ID");
-  }
-
-  return value;
-}
-
-function requireSecret(bindingName: "STREAM_API_TOKEN", value: string) {
-  if (
-    typeof value !== "string" ||
-    value.trim().length === 0 ||
-    value !== value.trim()
-  ) {
-    throw new ConfigurationError(bindingName);
-  }
-
-  return value;
-}
-
 export function loadConfig(env: ConfigurationBindings): AiruxConfig {
   const environment = requireEnvironment(env.AIRUX_ENVIRONMENT);
 
@@ -133,10 +107,6 @@ export function loadConfig(env: ConfigurationBindings): AiruxConfig {
         env.SUPABASE_SECRET_KEY,
         "sb_secret_",
       ),
-    },
-    stream: {
-      accountId: requireAccountId(env.CLOUDFLARE_ACCOUNT_ID),
-      apiToken: requireSecret("STREAM_API_TOKEN", env.STREAM_API_TOKEN),
     },
   };
 }

@@ -261,6 +261,8 @@ Technical requirements:
 
 - The API creates the Review and Evidence records before issuing an upload URL.
 - The API requests a one-time upload URL from Cloudflare Stream.
+- The MVP uses Stream's basic direct-upload binding and accepts recordings up
+  to 200 MiB; larger resumable `tus` uploads are deferred.
 - The MCP client uploads the recording directly to Stream.
 - Stream sends a signed processing webhook when the video becomes ready or fails.
 - A successful webhook transitions the Evidence to `ready` and the Review to `pending`.
@@ -501,6 +503,12 @@ Technical requirements:
 
 - Every endpoint validates its request against a shared versioned schema.
 - Mutating agent requests are idempotent.
+- Reusing `client_request_id` with the same creation payload returns the
+  existing Review; reusing it with different content returns a conflict.
+- Agent detail responses include Review metadata, Evidence state, and terminal
+  Decision feedback while excluding owner IDs, credential IDs, Stream video
+  IDs, and deletion metadata. Open-list responses use compact draft and pending
+  Review summaries.
 - All timestamps use UTC and RFC 3339 formatting.
 - Unauthorized and nonexistent Reviews return equivalent responses.
 - Private responses and playback-token responses are not cacheable.
@@ -571,7 +579,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
 | M3-1 | State-transition service | Implement and test allowed Review and Evidence lifecycle transitions. | Completed | M1-3, M1-6 |
-| M3-2 | Agent Review API | Implement create, get, list-open, and cancel endpoints with creation idempotency. | Not Started | M2-4, M3-1 |
+| M3-2 | Agent Review API | Implement create, get, list-open, and cancel endpoints with creation idempotency. | Completed | M2-4, M3-1 |
 | M3-3 | Reviewer API | Implement authorized Review retrieval and transactional, version-checked decisions. | Not Started | M2-2, M3-1 |
 | M3-4 | API contract tests | Verify validation, authorization, idempotency, and conflicting-decision behavior. | Not Started | M3-2, M3-3 |
 
@@ -583,7 +591,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 |---|---|---|---|---|
 | M4-1 | Capture-plan runner | Validate and execute the constrained Playwright action vocabulary. | Not Started | M1-3 |
 | M4-2 | Browser recording | Record an isolated session with host, viewport, duration, and timeout limits. | Not Started | M4-1 |
-| M4-3 | Stream upload integration | Request one-time private upload URLs from Cloudflare Stream. | Not Started | M1-7, M3-1 |
+| M4-3 | Stream upload integration | Request one-time private upload URLs from Cloudflare Stream. | Completed | M1-7, M3-1 |
 | M4-4 | Stream webhook | Verify processing webhooks and update Evidence and Review states. | Not Started | M3-1, M4-3 |
 | M4-5 | Direct upload workflow | Upload temporary recordings directly to Stream and remove local files after confirmation. | Not Started | M4-2, M4-3, M4-4 |
 | M4-6 | Create-review MCP tool | Coordinate capture, Review creation, upload, and review-link delivery. | Not Started | M3-2, M4-5 |

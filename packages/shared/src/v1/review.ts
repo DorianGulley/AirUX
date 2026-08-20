@@ -96,6 +96,91 @@ export const createReviewResponseSchema = z
   })
   .strict();
 
+export const agentReviewEvidenceSchema = z
+  .object({
+    id: identifierSchema,
+    kind: evidenceKindSchema,
+    status: evidenceStateSchema,
+    media_type: z
+      .string()
+      .regex(/^video\/[a-z0-9][a-z0-9.+-]*$/i, "Expected a video media type"),
+    size_bytes: positiveIntegerSchema.max(CONTRACT_LIMITS.mediaSizeBytes),
+    failure_code: z.string().trim().min(1).max(128).nullable(),
+  })
+  .strict();
+
+export const agentReviewDecisionSchema = z
+  .object({
+    outcome: decisionOutcomeSchema,
+    comment: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.commentLength)
+      .nullable(),
+    created_at: utcTimestampSchema,
+  })
+  .strict()
+  .superRefine((decision, context) => {
+    if (decision.outcome === "changes_requested" && decision.comment === null) {
+      context.addIssue({
+        code: "custom",
+        message: "A comment is required when requesting changes",
+        path: ["comment"],
+      });
+    }
+  });
+
+export const agentReviewSummarySchema = z
+  .object({
+    id: identifierSchema,
+    review_url: z.url(),
+    client_request_id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.clientRequestIdLength),
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    status: z.enum(["draft", "pending"]),
+    version: nonNegativeIntegerSchema,
+    created_at: utcTimestampSchema,
+    expires_at: utcTimestampSchema,
+  })
+  .strict();
+
+export const agentReviewSchema = z
+  .object({
+    id: identifierSchema,
+    review_url: z.url(),
+    client_request_id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(CONTRACT_LIMITS.clientRequestIdLength),
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    claim: z.string().trim().min(1).max(CONTRACT_LIMITS.claimLength),
+    criteria: reviewCriteriaSchema,
+    status: reviewStateSchema,
+    version: nonNegativeIntegerSchema,
+    created_at: utcTimestampSchema,
+    submitted_at: utcTimestampSchema.nullable(),
+    expires_at: utcTimestampSchema,
+    resolved_at: utcTimestampSchema.nullable(),
+    evidence: agentReviewEvidenceSchema,
+    decision: agentReviewDecisionSchema.nullable(),
+  })
+  .strict();
+
+export const getAgentReviewResponseSchema = z
+  .object({ review: agentReviewSchema })
+  .strict();
+
+export const listOpenAgentReviewsResponseSchema = z
+  .object({ reviews: z.array(agentReviewSummarySchema) })
+  .strict();
+
+export const cancelAgentReviewResponseSchema = getAgentReviewResponseSchema;
+
 export const decisionRequestSchema = z
   .object({
     expected_version: nonNegativeIntegerSchema,
@@ -206,6 +291,19 @@ export type BrowserVideoEvidenceInput = z.infer<
 >;
 export type CreateReviewRequest = z.infer<typeof createReviewRequestSchema>;
 export type CreateReviewResponse = z.infer<typeof createReviewResponseSchema>;
+export type AgentReviewEvidence = z.infer<typeof agentReviewEvidenceSchema>;
+export type AgentReviewDecision = z.infer<typeof agentReviewDecisionSchema>;
+export type AgentReviewSummary = z.infer<typeof agentReviewSummarySchema>;
+export type AgentReview = z.infer<typeof agentReviewSchema>;
+export type GetAgentReviewResponse = z.infer<
+  typeof getAgentReviewResponseSchema
+>;
+export type ListOpenAgentReviewsResponse = z.infer<
+  typeof listOpenAgentReviewsResponseSchema
+>;
+export type CancelAgentReviewResponse = z.infer<
+  typeof cancelAgentReviewResponseSchema
+>;
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
 export type Review = z.infer<typeof reviewSchema>;
 export type Evidence = z.infer<typeof evidenceSchema>;

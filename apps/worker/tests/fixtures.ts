@@ -4,8 +4,7 @@ export const TEST_ENV = {
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_public-test-value",
   SUPABASE_SECRET_KEY: "sb_secret_private-test-value",
-  CLOUDFLARE_ACCOUNT_ID: "0123456789abcdef0123456789abcdef",
-  STREAM_API_TOKEN: "private-stream-test-value",
+  STREAM: {} as StreamBinding,
   REVIEWER_AUTH_RATE_LIMITER: {
     limit: async () => ({ success: true }),
   },
