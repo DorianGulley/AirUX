@@ -4,6 +4,7 @@ export const TEST_ENV = {
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_public-test-value",
   SUPABASE_SECRET_KEY: "sb_secret_private-test-value",
+  STREAM_WEBHOOK_SECRET: "stream-webhook-test-secret",
   STREAM: {} as StreamBinding,
   REVIEWER_AUTH_RATE_LIMITER: {
     limit: async () => ({ success: true }),

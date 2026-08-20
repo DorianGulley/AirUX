@@ -8,7 +8,8 @@ The Worker uses generated `Env` bindings plus runtime validation in
 
 1. Start local Supabase with `pnpm db:start`.
 2. Copy `.dev.vars.example` to `.dev.vars`.
-3. Replace the placeholder with a local-only Supabase secret key.
+3. Replace the placeholders with a local-only Supabase secret key and the
+   signing secret for the active Stream webhook subscription.
 4. Start the Worker with `pnpm worker:dev`.
 
 The Worker command builds the browser client before serving assets. Browser
@@ -95,6 +96,24 @@ operations are scoped to both the authenticated owner and credential, and
 agent-facing responses omit owner IDs, credential IDs, Stream IDs, and deletion
 metadata.
 
+Stream sends processing results to:
+
+```text
+POST /api/v1/webhooks/cloudflare-stream
+```
+
+The handler verifies `Webhook-Signature` against the exact request bytes with
+HMAC-SHA256 and accepts timestamps within five minutes of Worker time. Signed
+ready notifications atomically record duration and dimensions, transition the
+Evidence to `ready`, and move a draft Review to `pending`. Error notifications
+transition only the Evidence to `failed`. Duplicate and unrelated signed
+notifications are acknowledged without reopening terminal state.
+
+Cloudflare permits one Stream webhook subscription per account. Register the
+environment's public endpoint through the Stream API, then store the returned
+signing secret as `STREAM_WEBHOOK_SECRET`. Updating the notification URL rotates
+that secret, so update the Worker secret at the same time.
+
 ## Review lifecycle service
 
 Review and Evidence state changes use `src/state-transitions.ts`, which calls
@@ -121,6 +140,7 @@ The `development` Wrangler environment explicitly deploys the existing
 
 ```sh
 pnpm --filter @airux/worker exec wrangler secret put SUPABASE_SECRET_KEY --env development
+pnpm --filter @airux/worker exec wrangler secret put STREAM_WEBHOOK_SECRET --env development
 ```
 
 Deployments use `pnpm worker:deploy`, which always selects the named
