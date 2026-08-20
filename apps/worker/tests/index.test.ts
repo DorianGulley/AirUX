@@ -84,6 +84,16 @@ describe("AirUX Worker", () => {
     });
   });
 
+  it("exposes the Stream webhook only as a POST endpoint", async () => {
+    const response = worker.fetch(
+      new Request("https://airux.app/api/v1/webhooks/cloudflare-stream"),
+      TEST_ENV,
+    );
+
+    expect(response.status).toBe(405);
+    expect(response.headers.get("allow")).toBe("POST");
+  });
+
   it("returns the versioned API not-found response for unknown routes", async () => {
     const response = worker.fetch(
       new Request("https://airux.app/api/v1/unknown"),

@@ -9,6 +9,7 @@ type ConfigurationBindings = Pick<
   | "SUPABASE_URL"
   | "SUPABASE_PUBLISHABLE_KEY"
   | "SUPABASE_SECRET_KEY"
+  | "STREAM_WEBHOOK_SECRET"
 >;
 
 export interface AiruxConfig {
@@ -18,6 +19,9 @@ export interface AiruxConfig {
     readonly url: string;
     readonly publishableKey: string;
     readonly secretKey: string;
+  };
+  readonly stream: {
+    readonly webhookSecret: string;
   };
 }
 
@@ -85,6 +89,19 @@ function requirePrefix(
   return value;
 }
 
+function requireWebhookSecret(value: string) {
+  if (
+    typeof value !== "string" ||
+    value !== value.trim() ||
+    value.length < 16 ||
+    value.length > 512
+  ) {
+    throw new ConfigurationError("STREAM_WEBHOOK_SECRET");
+  }
+
+  return value;
+}
+
 export function loadConfig(env: ConfigurationBindings): AiruxConfig {
   const environment = requireEnvironment(env.AIRUX_ENVIRONMENT);
 
@@ -107,6 +124,9 @@ export function loadConfig(env: ConfigurationBindings): AiruxConfig {
         env.SUPABASE_SECRET_KEY,
         "sb_secret_",
       ),
+    },
+    stream: {
+      webhookSecret: requireWebhookSecret(env.STREAM_WEBHOOK_SECRET),
     },
   };
 }

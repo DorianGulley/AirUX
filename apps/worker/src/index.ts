@@ -15,6 +15,7 @@ import {
   handleReviewerReviewDecision,
   handleReviewerReviewGet,
 } from "./reviewer-reviews.js";
+import { handleStreamWebhook } from "./stream-webhook.js";
 
 const HEALTH_PATH = "/api/v1/health";
 const CONFIG_PATH = "/api/v1/config";
@@ -26,6 +27,7 @@ const AGENT_REVIEW_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)$/;
 const AGENT_REVIEW_CANCEL_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)\/cancel$/;
 const REVIEWER_REVIEW_PATH = /^\/api\/v1\/reviews\/([^/]+)$/;
 const REVIEWER_REVIEW_DECISION_PATH = /^\/api\/v1\/reviews\/([^/]+)\/decision$/;
+const STREAM_WEBHOOK_PATH = "/api/v1/webhooks/cloudflare-stream";
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 
 function rateLimitErrorResponse(status: 429 | 503) {
@@ -135,6 +137,23 @@ const worker = {
           publishable_key: config.supabase.publishableKey,
         },
       });
+    }
+
+    if (pathname === STREAM_WEBHOOK_PATH) {
+      if (request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "POST" },
+        );
+      }
+
+      return handleStreamWebhook(request, config);
     }
 
     if (pathname === AGENT_CREDENTIALS_PATH) {
