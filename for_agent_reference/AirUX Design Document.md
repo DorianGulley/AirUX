@@ -264,8 +264,15 @@ Technical requirements:
 - The MVP uses Stream's basic direct-upload binding and accepts recordings up
   to 200 MiB; larger resumable `tus` uploads are deferred.
 - The MCP client uploads the recording directly to Stream.
+- The MCP client accepts direct-upload destinations only on Cloudflare Stream's
+  canonical HTTPS upload origin and never sends an agent credential with the
+  upload request.
 - Stream sends a signed processing webhook when the video becomes ready or fails.
 - A successful webhook transitions the Evidence to `ready` and the Review to `pending`.
+- After Stream accepts the upload, the MCP client polls the authenticated Review
+  state for up to five minutes and deletes the temporary recording only after
+  its Evidence becomes `ready`; upload errors, processing failures, and timeouts
+  preserve the recording for retry.
 - `client_request_id` prevents duplicate Reviews when creation is retried.
 
 ### 6.5 Authentication and Authorization
@@ -600,7 +607,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M4-2 | Browser recording | Record an isolated session with host, viewport, duration, and timeout limits. | Completed | M4-1 |
 | M4-3 | Stream upload integration | Request one-time private upload URLs from Cloudflare Stream. | Completed | M1-7, M3-1 |
 | M4-4 | Stream webhook | Verify processing webhooks and update Evidence and Review states. | Completed | M3-1, M4-3 |
-| M4-5 | Direct upload workflow | Upload temporary recordings directly to Stream and remove local files after confirmation. | Not Started | M4-2, M4-3, M4-4 |
+| M4-5 | Direct upload workflow | Upload temporary recordings directly to Stream and remove local files after confirmation. | Completed | M4-2, M4-3, M4-4 |
 | M4-6 | Create-review MCP tool | Coordinate capture, Review creation, upload, and review-link delivery. | Not Started | M3-2, M4-5 |
 
 ### M5: Enable human review
