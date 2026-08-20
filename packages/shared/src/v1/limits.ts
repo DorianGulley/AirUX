@@ -12,7 +12,7 @@ export const CONTRACT_LIMITS = {
   fillValueLength: 10_000,
   identifierLength: 128,
   keyLength: 64,
-  mediaSizeBytes: 500 * 1024 * 1024,
+  mediaSizeBytes: 200 * 1024 * 1024,
   pauseDurationMs: 10_000,
   requestIdLength: 128,
   scrollDelta: 100_000,

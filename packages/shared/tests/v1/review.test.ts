@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   API_ERROR_CODES,
+  agentReviewSchema,
+  CONTRACT_LIMITS,
   createReviewRequestSchema,
   createReviewResponseSchema,
   decisionRequestSchema,
@@ -94,6 +96,19 @@ describe("createReviewRequestSchema", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("caps basic Stream uploads at 200 MiB", () => {
+    expect(CONTRACT_LIMITS.mediaSizeBytes).toBe(200 * 1024 * 1024);
+    expect(
+      createReviewRequestSchema.safeParse({
+        ...validCreateRequest,
+        evidence: {
+          ...validCreateRequest.evidence,
+          size_bytes: CONTRACT_LIMITS.mediaSizeBytes + 1,
+        },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("Review and Evidence resources", () => {
@@ -174,6 +189,41 @@ describe("Review and Evidence resources", () => {
         upload_expires_at: "2026-08-12T01:15:00Z",
       }).success,
     ).toBe(true);
+  });
+
+  it("defines an agent-safe Review without owner or provider fields", () => {
+    const parsed = agentReviewSchema.parse({
+      id: "rvw_1",
+      review_url: "https://airux.app/reviews/rvw_1",
+      client_request_id: "agent-run-42",
+      title: validCreateRequest.title,
+      claim: validCreateRequest.claim,
+      criteria: validCreateRequest.criteria,
+      status: "approved",
+      version: 2,
+      created_at: "2026-08-12T01:00:00Z",
+      submitted_at: "2026-08-12T01:01:00Z",
+      expires_at: "2026-08-15T01:01:00Z",
+      resolved_at: "2026-08-12T01:02:00Z",
+      evidence: {
+        id: "evd_1",
+        kind: "browser_video",
+        status: "ready",
+        media_type: "video/webm",
+        size_bytes: 1_024,
+        failure_code: null,
+      },
+      decision: {
+        outcome: "approved",
+        comment: null,
+        created_at: "2026-08-12T01:02:00Z",
+      },
+    });
+
+    expect(parsed.status).toBe("approved");
+    expect(parsed).not.toHaveProperty("user_id");
+    expect(parsed.evidence).not.toHaveProperty("stream_video_id");
+    expect(parsed.evidence).not.toHaveProperty("delete_after");
   });
 });
 

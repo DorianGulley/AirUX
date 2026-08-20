@@ -13,10 +13,6 @@ describe("loadConfig", () => {
         publishableKey: "sb_publishable_public-test-value",
         secretKey: "sb_secret_private-test-value",
       },
-      stream: {
-        accountId: "0123456789abcdef0123456789abcdef",
-        apiToken: "private-stream-test-value",
-      },
     });
   });
 
@@ -41,9 +37,6 @@ describe("loadConfig", () => {
       { SUPABASE_PUBLISHABLE_KEY: "public-test-value" },
     ],
     ["SUPABASE_SECRET_KEY", { SUPABASE_SECRET_KEY: "private-test-value" }],
-    ["CLOUDFLARE_ACCOUNT_ID", { CLOUDFLARE_ACCOUNT_ID: "not-an-id" }],
-    ["STREAM_API_TOKEN", { STREAM_API_TOKEN: " " }],
-    ["STREAM_API_TOKEN", { STREAM_API_TOKEN: undefined }],
   ])("rejects an invalid %s binding", (bindingName, override) => {
     expect(() => loadConfig({ ...TEST_ENV, ...override })).toThrow(
       new ConfigurationError(bindingName as keyof Env),

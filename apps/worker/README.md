@@ -8,7 +8,7 @@ The Worker uses generated `Env` bindings plus runtime validation in
 
 1. Start local Supabase with `pnpm db:start`.
 2. Copy `.dev.vars.example` to `.dev.vars`.
-3. Replace both placeholders with local-only development credentials.
+3. Replace the placeholder with a local-only Supabase secret key.
 4. Start the Worker with `pnpm worker:dev`.
 
 The Worker command builds the browser client before serving assets. Browser
@@ -16,8 +16,8 @@ configuration is loaded from `GET /api/v1/config`; that response contains only
 the public Supabase URL and publishable key and is marked `no-store`.
 
 Wrangler reads `.dev.vars` only for local development. The file is ignored by
-Git. The Stream token is required for configuration validation even though the
-Stream integration is introduced in M4-3.
+Git. Cloudflare Stream access uses the `STREAM` Worker binding, so no Stream API
+token is exposed to the Worker or stored in local environment files.
 
 Protected reviewer routes use the browser's Supabase access token from the
 `Authorization: Bearer <token>` header. The Worker validates the token with
@@ -62,6 +62,24 @@ credential ID and owning user ID to agent route handlers. Agent credentials are
 never accepted by reviewer routes, and authentication never returns the stored
 digest or provider details. `last_used_at` tracking is intentionally deferred.
 
+Authenticated agents manage their own Reviews through:
+
+```text
+POST /api/v1/agent/reviews
+GET  /api/v1/agent/reviews
+GET  /api/v1/agent/reviews/:id
+POST /api/v1/agent/reviews/:id/cancel
+```
+
+Creation atomically persists the Review and Evidence before requesting a
+private, 15-minute direct-upload URL from the Stream binding. Basic uploads are
+limited to 200 MiB and 120 seconds. Reusing a `client_request_id` with the same
+payload returns the existing draft Review and refreshes its upload slot; using
+the key with different content returns a conflict. Read and cancellation
+operations are scoped to both the authenticated owner and credential, and
+agent-facing responses omit owner IDs, credential IDs, Stream IDs, and deletion
+metadata.
+
 ## Review lifecycle service
 
 Review and Evidence state changes use `src/state-transitions.ts`, which calls
@@ -78,7 +96,6 @@ The `development` Wrangler environment explicitly deploys the existing
 
 ```sh
 pnpm --filter @airux/worker exec wrangler secret put SUPABASE_SECRET_KEY --env development
-pnpm --filter @airux/worker exec wrangler secret put STREAM_API_TOKEN --env development
 ```
 
 Deployments use `pnpm worker:deploy`, which always selects the named

@@ -1,7 +1,13 @@
+import { withAuthenticatedAgent } from "./agent-auth.js";
 import {
   handleAgentCredentialCollection,
   handleAgentCredentialRevocation,
 } from "./agent-credentials.js";
+import {
+  handleAgentReviewCancellation,
+  handleAgentReviewCollection,
+  handleAgentReviewGet,
+} from "./agent-reviews.js";
 import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
@@ -11,6 +17,9 @@ const CONFIG_PATH = "/api/v1/config";
 const AGENT_CREDENTIALS_PATH = "/api/v1/agent-credentials";
 const AGENT_CREDENTIAL_REVOKE_PATH =
   /^\/api\/v1\/agent-credentials\/([^/]+)\/revoke$/;
+const AGENT_REVIEWS_PATH = "/api/v1/agent/reviews";
+const AGENT_REVIEW_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)$/;
+const AGENT_REVIEW_CANCEL_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)\/cancel$/;
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 
 function rateLimitErrorResponse(status: 429 | 503) {
@@ -64,7 +73,7 @@ async function withReviewerRequestRateLimit(
 }
 
 const worker = {
-  fetch(request: Request, env: Env) {
+  fetch(request: Request, env: Env, context?: ExecutionContext) {
     let config: AiruxConfig;
 
     try {
@@ -180,6 +189,89 @@ const worker = {
         withAuthenticatedReviewer(request, config, (reviewer) =>
           handleAgentCredentialRevocation(credentialId, reviewer, config),
         ),
+      );
+    }
+
+    if (pathname === AGENT_REVIEWS_PATH) {
+      if (request.method !== "GET" && request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "GET, POST" },
+        );
+      }
+
+      return withAuthenticatedAgent(request, config, (agent) =>
+        handleAgentReviewCollection(request, agent, config, {
+          stream: {
+            createDirectUpload: (params) =>
+              env.STREAM.createDirectUpload(params),
+            deleteVideo: (id) => env.STREAM.video(id).delete(),
+          },
+          ...(context === undefined
+            ? {}
+            : {
+                waitUntil: (promise: Promise<unknown>) =>
+                  context.waitUntil(promise),
+              }),
+        }),
+      );
+    }
+
+    const cancelReviewMatch = pathname.match(AGENT_REVIEW_CANCEL_PATH);
+    if (cancelReviewMatch !== null) {
+      if (request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "POST" },
+        );
+      }
+      const reviewId = cancelReviewMatch[1];
+      if (reviewId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+      return withAuthenticatedAgent(request, config, (agent) =>
+        handleAgentReviewCancellation(reviewId, agent, config, {}),
+      );
+    }
+
+    const reviewMatch = pathname.match(AGENT_REVIEW_PATH);
+    if (reviewMatch !== null) {
+      if (request.method !== "GET") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "GET" },
+        );
+      }
+      const reviewId = reviewMatch[1];
+      if (reviewId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+      return withAuthenticatedAgent(request, config, (agent) =>
+        handleAgentReviewGet(reviewId, agent, config, {}),
       );
     }
 
