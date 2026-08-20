@@ -62,6 +62,21 @@ credential ID and owning user ID to agent route handlers. Agent credentials are
 never accepted by reviewer routes, and authentication never returns the stored
 digest or provider details. `last_used_at` tracking is intentionally deferred.
 
+Authenticated reviewers retrieve and decide their Reviews through:
+
+```text
+GET  /api/v1/reviews/:id
+POST /api/v1/reviews/:id/decision
+```
+
+Both routes filter by the authenticated reviewer ID and return the same `404`
+for malformed, missing, deleted, or foreign Review IDs. Reviewer responses
+include the presentation metadata and terminal Decision while omitting owner,
+credential, Stream, and deletion fields. Decisions require the current Review
+version and are committed with the terminal state transition in one Postgres
+transaction. Stale, repeated, and already-terminal submissions return `409`;
+requesting changes also requires a non-empty comment.
+
 Authenticated agents manage their own Reviews through:
 
 ```text

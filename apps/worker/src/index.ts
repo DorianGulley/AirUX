@@ -11,6 +11,10 @@ import {
 import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
+import {
+  handleReviewerReviewDecision,
+  handleReviewerReviewGet,
+} from "./reviewer-reviews.js";
 
 const HEALTH_PATH = "/api/v1/health";
 const CONFIG_PATH = "/api/v1/config";
@@ -20,6 +24,8 @@ const AGENT_CREDENTIAL_REVOKE_PATH =
 const AGENT_REVIEWS_PATH = "/api/v1/agent/reviews";
 const AGENT_REVIEW_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)$/;
 const AGENT_REVIEW_CANCEL_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)\/cancel$/;
+const REVIEWER_REVIEW_PATH = /^\/api\/v1\/reviews\/([^/]+)$/;
+const REVIEWER_REVIEW_DECISION_PATH = /^\/api\/v1\/reviews\/([^/]+)\/decision$/;
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 
 function rateLimitErrorResponse(status: 429 | 503) {
@@ -272,6 +278,62 @@ const worker = {
       }
       return withAuthenticatedAgent(request, config, (agent) =>
         handleAgentReviewGet(reviewId, agent, config, {}),
+      );
+    }
+
+    const reviewerDecisionMatch = pathname.match(REVIEWER_REVIEW_DECISION_PATH);
+    if (reviewerDecisionMatch !== null) {
+      if (request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "POST" },
+        );
+      }
+      const reviewId = reviewerDecisionMatch[1];
+      if (reviewId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, (reviewer) =>
+          handleReviewerReviewDecision(request, reviewId, reviewer, config),
+        ),
+      );
+    }
+
+    const reviewerReviewMatch = pathname.match(REVIEWER_REVIEW_PATH);
+    if (reviewerReviewMatch !== null) {
+      if (request.method !== "GET") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "GET" },
+        );
+      }
+      const reviewId = reviewerReviewMatch[1];
+      if (reviewId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, (reviewer) =>
+          handleReviewerReviewGet(reviewId, reviewer, config),
+        ),
       );
     }
 

@@ -509,6 +509,13 @@ Technical requirements:
   Decision feedback while excluding owner IDs, credential IDs, Stream video
   IDs, and deletion metadata. Open-list responses use compact draft and pending
   Review summaries.
+- Reviewer detail and Decision responses include title, claim, criteria,
+  lifecycle metadata, Evidence presentation metadata, and terminal Decision
+  feedback while excluding owner IDs, credential IDs, Stream video IDs, and
+  deletion metadata.
+- Reviewer decisions are accepted only for an owned, nondeleted `pending`
+  Review at the exact `expected_version`. Stale, repeated, and already-terminal
+  submissions return a conflict even when the requested outcome is identical.
 - All timestamps use UTC and RFC 3339 formatting.
 - Unauthorized and nonexistent Reviews return equivalent responses.
 - Private responses and playback-token responses are not cacheable.
@@ -580,7 +587,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 |---|---|---|---|---|
 | M3-1 | State-transition service | Implement and test allowed Review and Evidence lifecycle transitions. | Completed | M1-3, M1-6 |
 | M3-2 | Agent Review API | Implement create, get, list-open, and cancel endpoints with creation idempotency. | Completed | M2-4, M3-1 |
-| M3-3 | Reviewer API | Implement authorized Review retrieval and transactional, version-checked decisions. | Not Started | M2-2, M3-1 |
+| M3-3 | Reviewer API | Implement authorized Review retrieval and transactional, version-checked decisions. | Completed | M2-2, M3-1 |
 | M3-4 | API contract tests | Verify validation, authorization, idempotency, and conflicting-decision behavior. | Not Started | M3-2, M3-3 |
 
 ### M4: Capture and upload evidence
