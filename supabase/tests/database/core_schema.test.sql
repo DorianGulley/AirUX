@@ -1,6 +1,6 @@
 begin;
 
-select plan(40);
+select plan(43);
 
 select has_table('public', 'agent_credentials', 'creates AgentCredential storage');
 select has_table('public', 'reviews', 'creates Review storage');
@@ -95,6 +95,24 @@ select ok(
     and not has_function_privilege('anon', 'public.is_valid_review_criteria(jsonb)', 'execute')
     and not has_function_privilege('authenticated', 'public.is_valid_review_criteria(jsonb)', 'execute'),
   'only the trusted service role can execute the criteria validator'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.enforce_active_agent_credential_quota()',
+    'execute'
+  )
+    and not has_function_privilege(
+      'anon',
+      'public.enforce_active_agent_credential_quota()',
+      'execute'
+    )
+    and not has_function_privilege(
+      'authenticated',
+      'public.enforce_active_agent_credential_quota()',
+      'execute'
+    ),
+  'only the trusted service role can execute the credential quota trigger'
 );
 
 select ok(
@@ -283,6 +301,43 @@ values (
   '20000000-0000-4000-8000-000000000001',
   '00000000-0000-4000-8000-000000000001',
   'approved'
+);
+
+insert into public.agent_credentials (user_id, name, secret_hash)
+select
+  '00000000-0000-4000-8000-000000000001',
+  'Quota credential ' || credential_number,
+  'quota-hash-' || credential_number
+from generate_series(2, 20) as credential_number;
+
+select throws_ok(
+  $$
+    insert into public.agent_credentials (user_id, name, secret_hash)
+    values (
+      '00000000-0000-4000-8000-000000000001',
+      'Over quota',
+      'over-quota-hash'
+    )
+  $$,
+  'P0001',
+  'active agent credential quota exceeded',
+  'limits each reviewer to 20 active credentials'
+);
+
+update public.agent_credentials
+set revoked_at = now()
+where id = '10000000-0000-4000-8000-000000000001';
+
+select lives_ok(
+  $$
+    insert into public.agent_credentials (user_id, name, secret_hash)
+    values (
+      '00000000-0000-4000-8000-000000000001',
+      'Replacement credential',
+      'replacement-hash'
+    )
+  $$,
+  'revoking a credential frees an active quota slot'
 );
 
 select throws_ok(

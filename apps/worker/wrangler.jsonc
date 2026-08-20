@@ -22,6 +22,18 @@
   "triggers": {
     "crons": []
   },
+  "ratelimits": [
+    {
+      "name": "REVIEWER_AUTH_RATE_LIMITER",
+      "namespace_id": "742091001",
+      "simple": { "limit": 120, "period": 60 }
+    },
+    {
+      "name": "CREDENTIAL_CREATE_RATE_LIMITER",
+      "namespace_id": "742091002",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "env": {
     "development": {
       "name": "airux-dev",
@@ -34,7 +46,19 @@
       },
       "secrets": {
         "required": ["SUPABASE_SECRET_KEY", "STREAM_API_TOKEN"]
-      }
+      },
+      "ratelimits": [
+        {
+          "name": "REVIEWER_AUTH_RATE_LIMITER",
+          "namespace_id": "742091001",
+          "simple": { "limit": 120, "period": 60 }
+        },
+        {
+          "name": "CREDENTIAL_CREATE_RATE_LIMITER",
+          "namespace_id": "742091002",
+          "simple": { "limit": 10, "period": 60 }
+        }
+      ]
     }
   }
 }

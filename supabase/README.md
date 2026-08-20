@@ -20,6 +20,9 @@ Create a GitHub OAuth app for local development with these exact URLs:
 Copy `.env.example` to `.env` and add the OAuth app credentials before starting
 the local stack. The secret must remain outside source control.
 
+Email/password sign-up is disabled. Global sign-up remains enabled so GitHub
+OAuth can create reviewer accounts.
+
 ```sh
 pnpm db:start
 pnpm db:reset
@@ -54,4 +57,7 @@ client secrets. Do not include seed data when pushing to a production project.
 
 The hosted development project needs a separate GitHub OAuth app whose callback
 URL is `https://rulojrgnyibmjgsgqlys.supabase.co/auth/v1/callback`. Configure the
-provider credentials and exact AirUX redirect URL in the Supabase dashboard.
+provider credentials, set the site URL and redirect allow list to the exact
+AirUX Worker URL, and disable the email provider in the Supabase dashboard.
+Enable GitHub before disabling email so the project always has a working sign-in
+method.

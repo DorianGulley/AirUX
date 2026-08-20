@@ -1,10 +1,12 @@
 import { agentCredentialTokenSchema } from "@airux/shared/v1";
 
 import { jsonResponse } from "./api-response.js";
+import { readJsonResponse } from "./bounded-json.js";
 import type { AiruxConfig } from "./config.js";
 
 const ACCESS_TOKEN_MAX_LENGTH = 8_192;
 const ACCESS_TOKEN_PATTERN = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+const AUTH_RESPONSE_LIMIT = 16 * 1024;
 const REVIEWER_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -73,7 +75,7 @@ async function requestAuthenticatedReviewer(
   let body: unknown;
 
   try {
-    body = await response.json();
+    body = await readJsonResponse(response, AUTH_RESPONSE_LIMIT);
   } catch {
     throw new AuthenticationServiceError();
   }
@@ -86,6 +88,16 @@ async function requestAuthenticatedReviewer(
     !REVIEWER_ID_PATTERN.test(body.id)
   ) {
     throw new AuthenticationServiceError();
+  }
+
+  if (
+    !("app_metadata" in body) ||
+    typeof body.app_metadata !== "object" ||
+    body.app_metadata === null ||
+    !("provider" in body.app_metadata) ||
+    body.app_metadata.provider !== "github"
+  ) {
+    throw new AuthenticationRequiredError();
   }
 
   return { id: body.id };
