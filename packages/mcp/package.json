@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "browser:install": "playwright install chromium"
+  },
   "dependencies": {
     "@airux/shared": "workspace:*",
     "playwright": "1.62.1"
