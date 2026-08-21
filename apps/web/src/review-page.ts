@@ -1,4 +1,9 @@
-import type { ReviewerReview, StreamPlayback } from "@airux/shared/v1";
+import type {
+  DecisionRequest,
+  ReviewerReview,
+  StreamPlayback,
+} from "@airux/shared/v1";
+import { CONTRACT_LIMITS } from "@airux/shared/v1/limits";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -7,14 +12,23 @@ import {
   getSessionDisplayName,
 } from "./auth.js";
 import { loadBrowserConfig } from "./browser-config.js";
-import { createReviewPlayback, getReviewerReview } from "./review-api.js";
+import {
+  createReviewPlayback,
+  getReviewerReview,
+  ReviewApiError,
+  submitReviewDecision,
+} from "./review-api.js";
 import {
   observeReviewSession,
   restoreReviewSession,
   signInToReview,
   signOutFromReview,
 } from "./review-auth.js";
-import { getReviewFixtureMode, loadReviewFixture } from "./review-fixture.js";
+import {
+  decideReviewFixture,
+  getReviewFixtureMode,
+  loadReviewFixture,
+} from "./review-fixture.js";
 import { getReviewStatusLabel } from "./review-presentation.js";
 import type { ReviewRoute } from "./review-route.js";
 
@@ -112,7 +126,143 @@ function createLoadingState() {
   return main;
 }
 
-function createReviewDetails(review: ReviewerReview) {
+type DecisionSubmitter = (decision: DecisionRequest) => Promise<void>;
+
+function createDecisionSection(
+  review: ReviewerReview,
+  onDecision: DecisionSubmitter,
+) {
+  const section = createElement("section", "review-decision");
+  section.setAttribute("aria-labelledby", "decision-title");
+  const title = createElement("h2");
+  title.id = "decision-title";
+  title.textContent = "Your decision";
+  section.append(title);
+
+  if (review.decision !== null) {
+    const result = createElement("div", "review-decision-result");
+    const outcome = createElement("p", "review-decision-outcome");
+    outcome.textContent =
+      review.decision.outcome === "approved"
+        ? "You approved this review."
+        : "You requested changes.";
+    result.append(outcome);
+    if (review.decision.comment !== null) {
+      const commentLabel = createElement("p", "review-decision-comment-label");
+      commentLabel.textContent = "Feedback sent";
+      const comment = createElement("p", "review-decision-comment");
+      comment.textContent = review.decision.comment;
+      result.append(commentLabel, comment);
+    }
+    const recorded = createElement("p", "review-decision-hint");
+    recorded.textContent =
+      "This decision is final and has been sent to the agent.";
+    result.append(recorded);
+    section.append(result);
+    return section;
+  }
+
+  if (review.status !== "pending") {
+    const unavailable = createElement("p", "review-decision-hint");
+    unavailable.textContent =
+      review.status === "draft"
+        ? "This review is not ready for a decision yet."
+        : "This review no longer accepts decisions.";
+    section.append(unavailable);
+    return section;
+  }
+
+  const form = createElement("form", "review-decision-form");
+  const label = createElement("label", "review-comment-label");
+  label.htmlFor = "decision-comment";
+  label.textContent = "Feedback";
+  const optional = createElement("span");
+  optional.textContent = "Optional for approval";
+  label.append(optional);
+  const comment = createElement("textarea", "review-comment-input");
+  comment.id = "decision-comment";
+  comment.name = "comment";
+  comment.rows = 4;
+  comment.maxLength = CONTRACT_LIMITS.commentLength;
+  comment.placeholder = "What should the agent correct or show next?";
+  const hint = createElement("p", "review-decision-hint");
+  hint.id = "decision-hint";
+  hint.textContent = "Feedback is required when requesting changes.";
+  comment.setAttribute("aria-describedby", hint.id);
+
+  const actions = createElement("div", "review-decision-actions");
+  const approveButton = createElement(
+    "button",
+    "review-decision-button review-approve-action",
+  );
+  approveButton.type = "button";
+  approveButton.textContent = "Approve";
+  const requestChangesButton = createElement(
+    "button",
+    "review-decision-button review-changes-action",
+  );
+  requestChangesButton.type = "button";
+  requestChangesButton.textContent = "Request changes";
+  actions.append(approveButton, requestChangesButton);
+
+  const status = createElement("p", "review-decision-status");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+
+  let submitting = false;
+  const submit = async (outcome: DecisionRequest["outcome"]) => {
+    if (submitting) {
+      return;
+    }
+    const feedback = comment.value.trim();
+    if (outcome === "changes_requested" && feedback.length === 0) {
+      comment.setAttribute("aria-invalid", "true");
+      status.textContent = "Add feedback before requesting changes.";
+      comment.focus();
+      return;
+    }
+
+    submitting = true;
+    comment.removeAttribute("aria-invalid");
+    comment.disabled = true;
+    approveButton.disabled = true;
+    requestChangesButton.disabled = true;
+    status.textContent =
+      outcome === "approved" ? "Submitting approval…" : "Sending feedback…";
+    try {
+      await onDecision({
+        expected_version: review.version,
+        outcome,
+        ...(feedback.length === 0 ? {} : { comment: feedback }),
+      });
+    } catch {
+      submitting = false;
+      comment.disabled = false;
+      approveButton.disabled = false;
+      requestChangesButton.disabled = false;
+      status.textContent =
+        "Your decision could not be submitted. Please try again.";
+    }
+  };
+
+  approveButton.addEventListener("click", () => {
+    void submit("approved");
+  });
+  requestChangesButton.addEventListener("click", () => {
+    void submit("changes_requested");
+  });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
+  form.append(label, comment, hint, actions, status);
+  section.append(form);
+  return section;
+}
+
+function createReviewDetails(
+  review: ReviewerReview,
+  onDecision: DecisionSubmitter,
+) {
   const details = createElement("aside", "review-panel review-detail-panel");
   details.setAttribute("aria-label", "Review details and decision");
 
@@ -150,36 +300,13 @@ function createReviewDetails(review: ReviewerReview) {
   boundary.textContent =
     "Approval applies only to this claim and the evidence shown.";
 
-  const decision = createElement("section", "review-decision");
-  decision.setAttribute("aria-labelledby", "decision-title");
-  const decisionTitle = createElement("h2");
-  decisionTitle.id = "decision-title";
-  decisionTitle.textContent = "Your decision";
-  const decisionHint = createElement("p", "review-decision-hint");
-  decisionHint.id = "decision-hint";
-  decisionHint.textContent =
-    "Decision submission will be connected in the next milestone.";
-  const decisionActions = createElement("div", "review-decision-actions");
-  const approveButton = createElement(
-    "button",
-    "review-decision-button review-approve-action",
+  details.append(
+    statusRow,
+    claim,
+    criteria,
+    boundary,
+    createDecisionSection(review, onDecision),
   );
-  approveButton.type = "button";
-  approveButton.disabled = true;
-  approveButton.setAttribute("aria-describedby", decisionHint.id);
-  approveButton.textContent = "Approve";
-  const requestChangesButton = createElement(
-    "button",
-    "review-decision-button review-changes-action",
-  );
-  requestChangesButton.type = "button";
-  requestChangesButton.disabled = true;
-  requestChangesButton.setAttribute("aria-describedby", decisionHint.id);
-  requestChangesButton.textContent = "Request changes";
-  decisionActions.append(approveButton, requestChangesButton);
-  decision.append(decisionTitle, decisionActions, decisionHint);
-
-  details.append(statusRow, claim, criteria, boundary, decision);
   return details;
 }
 
@@ -227,6 +354,7 @@ function createPlaybackFrame(
 function createReadyState(
   review: ReviewerReview,
   playback: StreamPlayback | "unavailable" | null,
+  onDecision: DecisionSubmitter,
 ) {
   const main = createElement("main", "review-state-shell");
   main.dataset.reviewState = "ready";
@@ -257,7 +385,7 @@ function createReadyState(
 
   evidence.append(evidenceHeading, createPlaybackFrame(review, playback));
 
-  layout.append(evidence, createReviewDetails(review));
+  layout.append(evidence, createReviewDetails(review, onDecision));
   main.append(heading, layout);
   return main;
 }
@@ -420,8 +548,42 @@ export async function initializeReviewPage(
       if (sequence !== renderSequence) {
         return;
       }
-      document.title = `${review.title} | AirUX`;
-      renderPageState(createReadyState(review, playback), account);
+      const renderReview = (
+        currentReview: ReviewerReview,
+        currentPlayback: StreamPlayback | "unavailable" | null,
+      ) => {
+        const onDecision: DecisionSubmitter = async (decision) => {
+          let decidedReview: ReviewerReview;
+          try {
+            decidedReview =
+              fixtureMode === null
+                ? await submitReviewDecision(
+                    currentReview.id,
+                    session.access_token,
+                    decision,
+                  )
+                : decideReviewFixture(currentReview, decision);
+          } catch (error) {
+            if (error instanceof ReviewApiError && error.status === 409) {
+              await renderSession(session);
+              return;
+            }
+            throw error;
+          }
+          if (sequence !== renderSequence) {
+            return;
+          }
+          document.title = `${decidedReview.title} | AirUX`;
+          renderReview(decidedReview, currentPlayback);
+        };
+
+        document.title = `${currentReview.title} | AirUX`;
+        renderPageState(
+          createReadyState(currentReview, currentPlayback, onDecision),
+          account,
+        );
+      };
+      renderReview(review, playback);
     } catch {
       if (sequence !== renderSequence) {
         return;

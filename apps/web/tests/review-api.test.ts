@@ -4,6 +4,7 @@ import {
   createReviewPlayback,
   getReviewerReview,
   ReviewApiError,
+  submitReviewDecision,
 } from "../src/review-api.js";
 
 const ACCESS_TOKEN = "header.payload.signature";
@@ -71,6 +72,108 @@ describe("browser Review API", () => {
     );
   });
 
+  it("submits the current Review version and returns the terminal Review", async () => {
+    const decidedReview = {
+      ...review,
+      status: "approved",
+      version: 2,
+      resolved_at: "2026-08-20T08:02:00.000Z",
+      decision: {
+        outcome: "approved",
+        comment: "Looks good.",
+        created_at: "2026-08-20T08:02:00.000Z",
+      },
+    } as const;
+    const fetcher = vi.fn(async () => Response.json({ review: decidedReview }));
+
+    await expect(
+      submitReviewDecision(
+        REVIEW_ID,
+        ACCESS_TOKEN,
+        {
+          expected_version: 1,
+          outcome: "approved",
+          comment: "  Looks good.  ",
+        },
+        fetcher,
+      ),
+    ).resolves.toEqual(decidedReview);
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith(
+      `/api/v1/reviews/${REVIEW_ID}/decision`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ACCESS_TOKEN}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          expected_version: 1,
+          outcome: "approved",
+          comment: "Looks good.",
+        }),
+      },
+    );
+  });
+
+  it("allows approval without an optional comment", async () => {
+    const decidedReview = {
+      ...review,
+      status: "approved",
+      version: 2,
+      resolved_at: "2026-08-20T08:02:00.000Z",
+      decision: {
+        outcome: "approved",
+        comment: null,
+        created_at: "2026-08-20T08:02:00.000Z",
+      },
+    } as const;
+    const fetcher = vi.fn(async () => Response.json({ review: decidedReview }));
+
+    await expect(
+      submitReviewDecision(
+        REVIEW_ID,
+        ACCESS_TOKEN,
+        { expected_version: 1, outcome: "approved" },
+        fetcher,
+      ),
+    ).resolves.toEqual(decidedReview);
+    expect(fetcher.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify({ expected_version: 1, outcome: "approved" }),
+    );
+  });
+
+  it("rejects a change request without actionable feedback before fetching", async () => {
+    const fetcher = vi.fn();
+
+    await expect(
+      submitReviewDecision(
+        REVIEW_ID,
+        ACCESS_TOKEN,
+        { expected_version: 1, outcome: "changes_requested" },
+        fetcher,
+      ),
+    ).rejects.toEqual(new ReviewApiError());
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("preserves conflict status so the page can refresh stale Reviews", async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json(
+        { error: { code: "conflict", message: "Review conflict" } },
+        { status: 409 },
+      ),
+    );
+
+    await expect(
+      submitReviewDecision(
+        REVIEW_ID,
+        ACCESS_TOKEN,
+        { expected_version: 1, outcome: "approved" },
+        fetcher,
+      ),
+    ).rejects.toMatchObject({ status: 409 });
+  });
+
   it.each([
     ["invalid Review ID", () => getReviewerReview("rvw_invalid", ACCESS_TOKEN)],
     ["invalid access token", () => getReviewerReview(REVIEW_ID, "private")],
@@ -100,7 +203,19 @@ describe("browser Review API", () => {
           vi.fn(async () => new Response("private", { status: 404 })),
         ),
     ],
+    [
+      "invalid Decision response",
+      () =>
+        submitReviewDecision(
+          REVIEW_ID,
+          ACCESS_TOKEN,
+          { expected_version: 1, outcome: "approved" },
+          vi.fn(async () =>
+            Response.json({ review: { ...review, version: 2 } }),
+          ),
+        ),
+    ],
   ])("fails closed for %s", async (_name, operation) => {
-    await expect(operation()).rejects.toEqual(new ReviewApiError());
+    await expect(operation()).rejects.toBeInstanceOf(ReviewApiError);
   });
 });

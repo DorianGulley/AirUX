@@ -620,7 +620,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M5-2 | Review presentation | Display the title, claim, criteria, status, and decision controls. | Completed | M5-1 |
 | M5-3 | UI authentication | Connect the web application to reviewer sign-in and protected Review routes. | Completed | M2-1, M5-1 |
 | M5-4 | Private playback | Issue short-lived playback tokens and play video directly from Stream. | Completed | M3-3, M4-4, M5-2, M5-3 |
-| M5-5 | Decision experience | Connect Approve and Request changes to the transactional Decision API. | Not Started | M3-3, M5-2, M5-3 |
+| M5-5 | Decision experience | Connect Approve and Request changes to the transactional Decision API. | Completed | M3-3, M5-2, M5-3 |
 | M5-6 | Review-flow integration | Verify capture, upload, playback, and decision across desktop and mobile layouts. | Not Started | M4-6, M5-4, M5-5 |
 
 ### M6: Complete the asynchronous lifecycle

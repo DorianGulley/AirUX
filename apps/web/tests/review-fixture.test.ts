@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  decideReviewFixture,
   getReviewFixtureMode,
   loadReviewFixture,
 } from "../src/review-fixture.js";
@@ -29,6 +30,30 @@ describe("Review fixtures", () => {
     expect(review.status).toBe("pending");
     expect(review.evidence.status).toBe("ready");
     expect(review.criteria).toHaveLength(2);
+  });
+
+  it("resolves fixture decisions with terminal feedback", async () => {
+    const review = await loadReviewFixture("rvw_requested", "ready");
+    const decided = decideReviewFixture(
+      review,
+      {
+        expected_version: review.version,
+        outcome: "changes_requested",
+        comment: "  Show the compact navigation.  ",
+      },
+      new Date("2026-08-20T19:00:00.000Z"),
+    );
+
+    expect(decided).toMatchObject({
+      status: "changes_requested",
+      version: review.version + 1,
+      resolved_at: "2026-08-20T19:00:00.000Z",
+      decision: {
+        outcome: "changes_requested",
+        comment: "Show the compact navigation.",
+        created_at: "2026-08-20T19:00:00.000Z",
+      },
+    });
   });
 
   it("rejects the error fixture", async () => {

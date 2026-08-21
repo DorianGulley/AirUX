@@ -1,4 +1,4 @@
-import type { ReviewerReview } from "@airux/shared/v1";
+import type { DecisionRequest, ReviewerReview } from "@airux/shared/v1";
 
 export type ReviewFixtureMode = "ready" | "loading" | "error";
 
@@ -64,4 +64,23 @@ export function loadReviewFixture(
   }
 
   return Promise.resolve({ ...REVIEW_FIXTURE, id: reviewId });
+}
+
+export function decideReviewFixture(
+  review: ReviewerReview,
+  decision: DecisionRequest,
+  now = new Date(),
+): ReviewerReview {
+  const comment = decision.comment?.trim() ?? null;
+  return {
+    ...review,
+    status: decision.outcome,
+    version: review.version + 1,
+    resolved_at: now.toISOString(),
+    decision: {
+      outcome: decision.outcome,
+      comment,
+      created_at: now.toISOString(),
+    },
+  };
 }
