@@ -550,14 +550,97 @@ input:focus-visible {
   font-size: 1.2rem;
 }
 
-.review-detail-copy {
-  margin: 1rem 0 0;
-  color: #536151;
-  line-height: 1.62;
+.review-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #dce5d8;
+}
+
+.review-status-label {
+  color: #657163;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-status {
+  display: inline-flex;
+  min-height: 1.85rem;
+  padding: 0.3rem 0.65rem;
+  align-items: center;
+  border-radius: 999px;
+  color: #395334;
+  background: #dfeeda;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.review-status[data-status="approved"] {
+  color: #1e552f;
+  background: #d7efdc;
+}
+
+.review-status[data-status="changes_requested"] {
+  color: #74332c;
+  background: #f5ded9;
+}
+
+.review-status[data-status="cancelled"],
+.review-status[data-status="expired"] {
+  color: #5c5f59;
+  background: #e5e7e2;
+}
+
+.review-detail-section {
+  margin-top: 1.5rem;
+}
+
+.review-claim {
+  margin: 0.75rem 0 0;
+  color: #3d4a3b;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.review-criteria {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: review-criterion;
+}
+
+.review-criteria li {
+  display: grid;
+  grid-template-columns: 1.7rem minmax(0, 1fr);
+  gap: 0.65rem;
+  align-items: start;
+  color: #4d5a4a;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  counter-increment: review-criterion;
+}
+
+.review-criteria li::before {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #34542f;
+  background: #e4eee0;
+  content: counter(review-criterion);
+  font-size: 0.72rem;
+  font-weight: 850;
 }
 
 .review-boundary {
-  margin: 2rem 0 0;
+  margin: 1.75rem 0 0;
   padding: 1rem;
   border-left: 3px solid #84a47d;
   border-radius: 0 0.65rem 0.65rem 0;
@@ -565,6 +648,46 @@ input:focus-visible {
   background: #edf3e9;
   font-size: 0.84rem;
   line-height: 1.55;
+}
+
+.review-decision {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #dce5d8;
+}
+
+.review-decision-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.review-decision-button {
+  width: 100%;
+}
+
+.review-approve-action {
+  color: #fff;
+  background: #21391e;
+}
+
+.review-changes-action {
+  border: 1px solid #bdcbb8;
+  color: #32462e;
+  background: #f7faf5;
+}
+
+.review-decision-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.review-decision-hint {
+  margin: 0.75rem 0 0;
+  color: #707a6e;
+  font-size: 0.76rem;
+  line-height: 1.45;
 }
 
 .review-loading-heading {
@@ -678,10 +801,6 @@ input:focus-visible {
 @media (max-width: 52rem) {
   .review-layout {
     grid-template-columns: 1fr;
-  }
-
-  .review-detail-panel {
-    order: -1;
   }
 }
 
