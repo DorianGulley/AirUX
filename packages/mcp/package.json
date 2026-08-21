@@ -4,13 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "browser:install": "playwright install chromium"
+    "browser:install": "playwright install chromium",
+    "start": "tsx src/stdio.ts"
   },
   "dependencies": {
     "@airux/shared": "workspace:*",
+    "@modelcontextprotocol/server": "2.0.0",
     "playwright": "1.62.1"
   },
   "devDependencies": {
-    "@types/node": "26.2.0"
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/node": "26.2.0",
+    "tsx": "4.23.12"
   }
 }

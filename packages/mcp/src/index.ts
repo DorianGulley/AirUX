@@ -1,3 +1,7 @@
+export * from "./api-client.js";
 export * from "./browser-recording.js";
 export * from "./capture-plan-runner.js";
+export * from "./config.js";
+export * from "./create-review.js";
 export * from "./direct-upload.js";
+export * from "./server.js";

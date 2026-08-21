@@ -6,6 +6,8 @@ import {
   CONTRACT_LIMITS,
   createReviewRequestSchema,
   createReviewResponseSchema,
+  createReviewToolInputSchema,
+  createReviewToolOutputSchema,
   decisionRequestSchema,
   decisionSchema,
   EVIDENCE_STATES,
@@ -109,6 +111,56 @@ describe("createReviewRequestSchema", () => {
         },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("airux_create_review tool contracts", () => {
+  const capturePlan = {
+    start_url: "http://localhost:3000",
+    viewport: { width: 1_280, height: 720 },
+    max_duration_ms: 30_000,
+    steps: [{ action: "pause" as const, duration_ms: 250 }],
+  };
+
+  it("accepts review intent plus a constrained capture plan", () => {
+    expect(
+      createReviewToolInputSchema.parse({
+        client_request_id: validCreateRequest.client_request_id,
+        title: validCreateRequest.title,
+        claim: validCreateRequest.claim,
+        criteria: validCreateRequest.criteria,
+        capture_plan: capturePlan,
+      }),
+    ).toEqual({
+      client_request_id: validCreateRequest.client_request_id,
+      title: validCreateRequest.title,
+      claim: validCreateRequest.claim,
+      criteria: validCreateRequest.criteria,
+      capture_plan: capturePlan,
+    });
+  });
+
+  it("does not let callers supply evidence metadata", () => {
+    expect(
+      createReviewToolInputSchema.safeParse({
+        ...validCreateRequest,
+        capture_plan: capturePlan,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("returns only the pending review handoff", () => {
+    expect(
+      createReviewToolOutputSchema.parse({
+        review_id: "rvw_1",
+        review_url: "https://airux.app/reviews/rvw_1",
+        status: "pending",
+      }),
+    ).toEqual({
+      review_id: "rvw_1",
+      review_url: "https://airux.app/reviews/rvw_1",
+      status: "pending",
+    });
   });
 });
 
