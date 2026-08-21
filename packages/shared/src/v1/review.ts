@@ -242,6 +242,34 @@ export const getReviewerReviewResponseSchema = z
 export const decideReviewerReviewResponseSchema =
   getReviewerReviewResponseSchema;
 
+export const streamPlaybackSchema = z
+  .object({
+    token: z
+      .string()
+      .min(1)
+      .max(8_192)
+      .regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/),
+    player_url: z.url(),
+    expires_at: utcTimestampSchema,
+  })
+  .strict()
+  .superRefine((playback, context) => {
+    const match = playback.player_url.match(
+      /^https:\/\/customer-[a-z0-9]+\.cloudflarestream\.com\/([^/?#]+)\/iframe$/,
+    );
+    if (match?.[1] !== playback.token) {
+      context.addIssue({
+        code: "custom",
+        message: "Expected a Cloudflare Stream player URL",
+        path: ["player_url"],
+      });
+    }
+  });
+
+export const createPlaybackTokenResponseSchema = z
+  .object({ playback: streamPlaybackSchema })
+  .strict();
+
 export const decisionRequestSchema = z
   .object({
     expected_version: nonNegativeIntegerSchema,
@@ -381,6 +409,10 @@ export type GetReviewerReviewResponse = z.infer<
 >;
 export type DecideReviewerReviewResponse = z.infer<
   typeof decideReviewerReviewResponseSchema
+>;
+export type StreamPlayback = z.infer<typeof streamPlaybackSchema>;
+export type CreatePlaybackTokenResponse = z.infer<
+  typeof createPlaybackTokenResponseSchema
 >;
 export type DecisionRequest = z.infer<typeof decisionRequestSchema>;
 export type Review = z.infer<typeof reviewSchema>;

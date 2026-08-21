@@ -9,6 +9,8 @@ type ConfigurationBindings = Pick<
   | "SUPABASE_URL"
   | "SUPABASE_PUBLISHABLE_KEY"
   | "SUPABASE_SECRET_KEY"
+  | "STREAM_SIGNING_JWK"
+  | "STREAM_SIGNING_KEY_ID"
   | "STREAM_WEBHOOK_SECRET"
 >;
 
@@ -21,6 +23,8 @@ export interface AiruxConfig {
     readonly secretKey: string;
   };
   readonly stream: {
+    readonly signingJwk: string;
+    readonly signingKeyId: string;
     readonly webhookSecret: string;
   };
 }
@@ -102,6 +106,34 @@ function requireWebhookSecret(value: string) {
   return value;
 }
 
+function requireStreamSigningKeyId(value: string) {
+  if (
+    typeof value !== "string" ||
+    value !== value.trim() ||
+    value.length < 16 ||
+    value.length > 128 ||
+    !/^[A-Za-z0-9_-]+$/.test(value)
+  ) {
+    throw new ConfigurationError("STREAM_SIGNING_KEY_ID");
+  }
+
+  return value;
+}
+
+function requireStreamSigningJwk(value: string) {
+  if (
+    typeof value !== "string" ||
+    value !== value.trim() ||
+    value.length < 16 ||
+    value.length > 16_384 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(value)
+  ) {
+    throw new ConfigurationError("STREAM_SIGNING_JWK");
+  }
+
+  return value;
+}
+
 export function loadConfig(env: ConfigurationBindings): AiruxConfig {
   const environment = requireEnvironment(env.AIRUX_ENVIRONMENT);
 
@@ -126,6 +158,8 @@ export function loadConfig(env: ConfigurationBindings): AiruxConfig {
       ),
     },
     stream: {
+      signingJwk: requireStreamSigningJwk(env.STREAM_SIGNING_JWK),
+      signingKeyId: requireStreamSigningKeyId(env.STREAM_SIGNING_KEY_ID),
       webhookSecret: requireWebhookSecret(env.STREAM_WEBHOOK_SECRET),
     },
   };

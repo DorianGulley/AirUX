@@ -8,8 +8,9 @@ The Worker uses generated `Env` bindings plus runtime validation in
 
 1. Start local Supabase with `pnpm db:start`.
 2. Copy `.dev.vars.example` to `.dev.vars`.
-3. Replace the placeholders with a local-only Supabase secret key and the
-   signing secret for the active Stream webhook subscription.
+3. Replace the placeholders with a local-only Supabase secret key, the Stream
+   signing-key ID and base64-encoded private JWK, and the signing secret for the
+   active Stream webhook subscription.
 4. Start the Worker with `pnpm worker:dev`.
 
 The Worker command builds the browser client before serving assets. Browser
@@ -18,7 +19,9 @@ the public Supabase URL and publishable key and is marked `no-store`.
 
 Wrangler reads `.dev.vars` only for local development. The file is ignored by
 Git. Cloudflare Stream access uses the `STREAM` Worker binding, so no Stream API
-token is exposed to the Worker or stored in local environment files.
+token is exposed to the Worker or stored in local environment files. Private
+playback tokens are self-signed with a dedicated Stream signing key stored as
+Worker secrets.
 
 Protected reviewer routes use the browser's Supabase access token from the
 `Authorization: Bearer <token>` header. The Worker validates the token with
@@ -67,6 +70,7 @@ Authenticated reviewers retrieve and decide their Reviews through:
 
 ```text
 GET  /api/v1/reviews/:id
+POST /api/v1/evidence/:id/playback-token
 POST /api/v1/reviews/:id/decision
 ```
 
@@ -77,6 +81,12 @@ credential, Stream, and deletion fields. Decisions require the current Review
 version and are committed with the terminal state transition in one Postgres
 transaction. Stale, repeated, and already-terminal submissions return `409`;
 requesting changes also requires a non-empty comment.
+
+The playback endpoint first resolves an owned, nondeleted Review from ready
+Evidence, then verifies that Stream reports the video as ready and protected by
+signed URLs. It returns a `no-store` Stream player credential scoped to that
+video for 15 minutes. Cancelled, expired, deleted, foreign, and missing playback
+resources all fail without exposing the Stream video ID or owner ID.
 
 Authenticated agents manage their own Reviews through:
 
@@ -114,6 +124,11 @@ environment's public endpoint through the Stream API, then store the returned
 signing secret as `STREAM_WEBHOOK_SECRET`. Updating the notification URL rotates
 that secret, so update the Worker secret at the same time.
 
+Create one Stream signing key per environment through the Stream API and store
+the returned key ID and base64-encoded private JWK as
+`STREAM_SIGNING_KEY_ID` and `STREAM_SIGNING_JWK`. The private JWK is returned
+only when the key is created and must never be committed or logged.
+
 ## Review lifecycle service
 
 Review and Evidence state changes use `src/state-transitions.ts`, which calls
@@ -140,6 +155,8 @@ The `development` Wrangler environment explicitly deploys the existing
 
 ```sh
 pnpm --filter @airux/worker exec wrangler secret put SUPABASE_SECRET_KEY --env development
+pnpm --filter @airux/worker exec wrangler secret put STREAM_SIGNING_JWK --env development
+pnpm --filter @airux/worker exec wrangler secret put STREAM_SIGNING_KEY_ID --env development
 pnpm --filter @airux/worker exec wrangler secret put STREAM_WEBHOOK_SECRET --env development
 ```
 

@@ -39,12 +39,16 @@ const REVIEW_FIXTURE = {
 
 export function getReviewFixtureMode(
   searchParams: URLSearchParams,
-): ReviewFixtureMode {
+): ReviewFixtureMode | null {
   const requestedMode = searchParams.get("fixture");
-  if (requestedMode === "loading" || requestedMode === "error") {
+  if (
+    requestedMode === "ready" ||
+    requestedMode === "loading" ||
+    requestedMode === "error"
+  ) {
     return requestedMode;
   }
-  return "ready";
+  return null;
 }
 
 export function loadReviewFixture(

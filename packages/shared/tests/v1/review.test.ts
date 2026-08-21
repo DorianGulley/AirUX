@@ -4,6 +4,7 @@ import {
   API_ERROR_CODES,
   agentReviewSchema,
   CONTRACT_LIMITS,
+  createPlaybackTokenResponseSchema,
   createReviewRequestSchema,
   createReviewResponseSchema,
   createReviewToolInputSchema,
@@ -312,6 +313,44 @@ describe("Review and Evidence resources", () => {
     expect(parsed.review).not.toHaveProperty("agent_credential_id");
     expect(parsed.review.evidence).not.toHaveProperty("stream_video_id");
     expect(parsed.review.evidence).not.toHaveProperty("delete_after");
+  });
+});
+
+describe("private playback contract", () => {
+  const token = "header.payload.signature";
+
+  it("accepts a short-lived Cloudflare Stream player credential", () => {
+    expect(
+      createPlaybackTokenResponseSchema.parse({
+        playback: {
+          token,
+          player_url: `https://customer-example.cloudflarestream.com/${token}/iframe`,
+          expires_at: "2026-08-20T08:15:00.000Z",
+        },
+      }),
+    ).toEqual({
+      playback: {
+        token,
+        player_url: `https://customer-example.cloudflarestream.com/${token}/iframe`,
+        expires_at: "2026-08-20T08:15:00.000Z",
+      },
+    });
+  });
+
+  it.each([
+    "http://customer-example.cloudflarestream.com/header.payload.signature/iframe",
+    "https://example.com/header.payload.signature/iframe",
+    "https://customer-example.cloudflarestream.com/private-video-id/iframe",
+  ])("rejects an unsafe player URL: %s", (playerUrl) => {
+    expect(
+      createPlaybackTokenResponseSchema.safeParse({
+        playback: {
+          token,
+          player_url: playerUrl,
+          expires_at: "2026-08-20T08:15:00.000Z",
+        },
+      }).success,
+    ).toBe(false);
   });
 });
 

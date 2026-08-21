@@ -6,14 +6,14 @@ import {
 } from "../src/review-fixture.js";
 
 describe("Review fixtures", () => {
-  it("uses the ready fixture by default", () => {
-    expect(getReviewFixtureMode(new URLSearchParams())).toBe("ready");
+  it("uses live data unless an explicit fixture is selected", () => {
+    expect(getReviewFixtureMode(new URLSearchParams())).toBeNull();
     expect(getReviewFixtureMode(new URLSearchParams("fixture=unknown"))).toBe(
-      "ready",
+      null,
     );
   });
 
-  it.each(["loading", "error"] as const)(
+  it.each(["ready", "loading", "error"] as const)(
     "selects the %s fixture state",
     (mode) => {
       expect(getReviewFixtureMode(new URLSearchParams(`fixture=${mode}`))).toBe(
