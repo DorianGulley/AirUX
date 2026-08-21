@@ -6,6 +6,8 @@ import {
   createReviewResponseSchema,
   type GetAgentReviewResponse,
   getAgentReviewResponseSchema,
+  type ListOpenAgentReviewsResponse,
+  listOpenAgentReviewsResponseSchema,
 } from "@airux/shared/v1";
 
 import type { AiruxRuntimeConfig } from "./config.js";
@@ -234,5 +236,22 @@ export class AiruxApiClient {
       review: parsed.data.review,
       ...(retryDelay === undefined ? {} : { retryAfterMs: retryDelay }),
     };
+  }
+
+  async listOpenReviews(
+    signal: AbortSignal,
+  ): Promise<ListOpenAgentReviewsResponse> {
+    const { body } = await this.#request(
+      "/api/v1/agent/reviews",
+      { method: "GET", signal },
+      new Set([200]),
+    );
+    const parsed = listOpenAgentReviewsResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new AiruxApiError("AirUX returned an invalid Review list", {
+        retryable: false,
+      });
+    }
+    return parsed.data;
   }
 }

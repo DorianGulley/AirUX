@@ -223,6 +223,10 @@ export const listOpenAgentReviewsResponseSchema = z
   .object({ reviews: z.array(agentReviewSummarySchema) })
   .strict();
 
+export const listOpenReviewsToolInputSchema = z.object({}).strict();
+export const listOpenReviewsToolOutputSchema =
+  listOpenAgentReviewsResponseSchema;
+
 export const cancelAgentReviewResponseSchema = getAgentReviewResponseSchema;
 
 export const reviewerReviewEvidenceSchema = z
@@ -426,6 +430,12 @@ export type GetAgentReviewResponse = z.infer<
 >;
 export type ListOpenAgentReviewsResponse = z.infer<
   typeof listOpenAgentReviewsResponseSchema
+>;
+export type ListOpenReviewsToolInput = z.infer<
+  typeof listOpenReviewsToolInputSchema
+>;
+export type ListOpenReviewsToolOutput = z.infer<
+  typeof listOpenReviewsToolOutputSchema
 >;
 export type CancelAgentReviewResponse = z.infer<
   typeof cancelAgentReviewResponseSchema

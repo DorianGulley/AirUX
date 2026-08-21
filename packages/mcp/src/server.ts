@@ -7,6 +7,10 @@ import {
   type GetReviewToolOutput,
   getReviewToolInputSchema,
   getReviewToolOutputSchema,
+  type ListOpenReviewsToolInput,
+  type ListOpenReviewsToolOutput,
+  listOpenReviewsToolInputSchema,
+  listOpenReviewsToolOutputSchema,
 } from "@airux/shared/v1";
 import { McpServer } from "@modelcontextprotocol/server";
 
@@ -14,6 +18,7 @@ import { AiruxApiClient } from "./api-client.js";
 import type { AiruxRuntimeConfig } from "./config.js";
 import { createAiruxReview } from "./create-review.js";
 import { getAiruxReview } from "./get-review.js";
+import { listAiruxOpenReviews } from "./list-open-reviews.js";
 
 export interface AiruxMcpServerOptions {
   readonly config?: AiruxRuntimeConfig;
@@ -25,6 +30,29 @@ export interface AiruxMcpServerOptions {
     input: GetReviewToolInput,
     signal: AbortSignal,
   ) => Promise<GetReviewToolOutput>;
+  readonly listOpenReviews?: (
+    input: ListOpenReviewsToolInput,
+    signal: AbortSignal,
+  ) => Promise<ListOpenReviewsToolOutput>;
+}
+
+function openReviewsText(output: ListOpenReviewsToolOutput) {
+  if (output.reviews.length === 0) {
+    return "No open AirUX reviews were found.";
+  }
+  return [
+    "Open AirUX reviews:",
+    ...output.reviews.map((review) =>
+      [
+        `${review.status}: ${review.title}`,
+        `Review ID: ${review.id}`,
+        `Client request ID: ${review.client_request_id}`,
+        `Review URL: ${review.review_url}`,
+        `Expires at: ${review.expires_at}`,
+      ].join("\n"),
+    ),
+    "Use airux_get_review with a Review ID to resume waiting for its result.",
+  ].join("\n\n");
 }
 
 export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
@@ -45,7 +73,21 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
       ? undefined
       : (input: GetReviewToolInput, signal: AbortSignal) =>
           getAiruxReview(input, { api: new AiruxApiClient(config) }, signal));
-  if (createReview === undefined || getReview === undefined) {
+  const listOpenReviews =
+    options.listOpenReviews ??
+    (config === undefined
+      ? undefined
+      : (input: ListOpenReviewsToolInput, signal: AbortSignal) =>
+          listAiruxOpenReviews(
+            input,
+            { api: new AiruxApiClient(config) },
+            signal,
+          ));
+  if (
+    createReview === undefined ||
+    getReview === undefined ||
+    listOpenReviews === undefined
+  ) {
     throw new Error("AirUX MCP server configuration is required");
   }
 
@@ -128,6 +170,40 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
             {
               type: "text",
               text: "AirUX could not retrieve the human review result.",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+  server.registerTool(
+    "airux_list_open_reviews",
+    {
+      annotations: {
+        destructiveHint: false,
+        openWorldHint: true,
+        readOnlyHint: true,
+      },
+      description:
+        "List unresolved AirUX reviews created by the current agent credential so interrupted work can resume.",
+      inputSchema: listOpenReviewsToolInputSchema,
+      outputSchema: listOpenReviewsToolOutputSchema,
+      title: "List Open AirUX Reviews",
+    },
+    async (input, context) => {
+      try {
+        const output = await listOpenReviews(input, context.mcpReq.signal);
+        return {
+          content: [{ type: "text", text: openReviewsText(output) }],
+          structuredContent: output,
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "AirUX could not retrieve the open Reviews.",
             },
           ],
           isError: true,

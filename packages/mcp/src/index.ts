@@ -5,4 +5,5 @@ export * from "./config.js";
 export * from "./create-review.js";
 export * from "./direct-upload.js";
 export * from "./get-review.js";
+export * from "./list-open-reviews.js";
 export * from "./server.js";
