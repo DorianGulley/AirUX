@@ -399,6 +399,7 @@ describe("agent Review reads and cancellation", () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("retry-after")).toBeNull();
     expect(body).toMatchObject({
       review: {
         id: REVIEW_ID,
@@ -414,6 +415,18 @@ describe("agent Review reads and cancellation", () => {
     expect(JSON.stringify(body)).not.toContain("delete_after");
     expect(JSON.stringify(body)).not.toContain(AGENT.userId);
     expect(JSON.stringify(body)).not.toContain(AGENT.credentialId);
+  });
+
+  it("provides retry guidance while a Review remains open", async () => {
+    const response = await handleAgentReviewGet(REVIEW_ID, AGENT, CONFIG, {
+      fetcher: detailFetcher(),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("retry-after")).toBe("2");
+    await expect(response.json()).resolves.toMatchObject({
+      review: { id: REVIEW_ID, status: "pending", decision: null },
+    });
   });
 
   it("uses the same not-found response for malformed, missing, and foreign Reviews", async () => {

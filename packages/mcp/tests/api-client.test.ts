@@ -94,7 +94,7 @@ describe("AiruxApiClient", () => {
     };
     const fetcher = vi.fn(
       async (_input: string | URL | Request, _init?: RequestInit) =>
-        responseJson({ review }),
+        responseJson({ review }, 200, { "retry-after": "2" }),
     );
     const client = new AiruxApiClient(
       { agentToken: TOKEN, apiOrigin: "https://airux.example" },
@@ -104,9 +104,13 @@ describe("AiruxApiClient", () => {
     await expect(
       client.getReview(REVIEW_ID, new AbortController().signal),
     ).resolves.toEqual({ review });
-    expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+    await expect(
+      client.getReviewForPolling(REVIEW_ID, new AbortController().signal),
+    ).resolves.toEqual({ review, retryAfterMs: 2_000 });
+    expect(fetcher.mock.calls.map(([input]) => String(input))).toEqual([
       `https://airux.example/api/v1/agent/reviews/${REVIEW_ID}`,
-    );
+      `https://airux.example/api/v1/agent/reviews/${REVIEW_ID}`,
+    ]);
   });
 
   it("surfaces retry metadata without exposing API details", async () => {

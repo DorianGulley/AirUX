@@ -1,6 +1,7 @@
 # AirUX MCP server
 
-The local stdio server exposes `airux_create_review`. The tool records a
+The local stdio server exposes `airux_create_review` and `airux_get_review`.
+The create tool records a
 validated localhost browser flow, creates an AirUX Review, uploads the temporary
 WebM recording directly to Cloudflare Stream, waits for processing, removes the
 local recording, and returns the pending Review URL.
@@ -38,3 +39,9 @@ structured content. The tool captures once. Transient create calls reuse the
 same idempotency key, and ambiguous uploads receive one bounded state-based
 recovery attempt before the temporary recording is deleted and a sanitized tool
 error is returned.
+
+`airux_get_review` accepts a `review_id`, then waits locally for the Review to
+reach a terminal state. It polls the authenticated AirUX API with increasing
+intervals, honors server retry guidance, and returns the final status and human
+Decision. Cancelling the MCP request interrupts the wait without changing the
+remotely stored Review.

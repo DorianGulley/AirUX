@@ -27,10 +27,22 @@ async function connect(
   createReview: NonNullable<
     Parameters<typeof createAiruxMcpServer>[0]["createReview"]
   >,
+  getReview: NonNullable<
+    Parameters<typeof createAiruxMcpServer>[0]["getReview"]
+  > = vi.fn(async () => ({
+    review_id: REVIEW_ID,
+    review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+    status: "approved" as const,
+    decision: {
+      outcome: "approved" as const,
+      comment: null,
+      created_at: "2026-08-20T22:10:00.000Z",
+    },
+  })),
 ) {
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
-  const server = createAiruxMcpServer({ createReview });
+  const server = createAiruxMcpServer({ createReview, getReview });
   const client = new Client({ name: "airux-test", version: "0.1.0" });
   await Promise.all([
     server.connect(serverTransport),
@@ -55,6 +67,7 @@ describe("AirUX MCP server", () => {
     const tools = await client.listTools();
     expect(tools.tools.map(({ name }) => name)).toEqual([
       "airux_create_review",
+      "airux_get_review",
     ]);
     const result = await client.callTool({
       arguments: toolInput,
@@ -75,6 +88,49 @@ describe("AirUX MCP server", () => {
     ]);
     expect(createReview).toHaveBeenCalledWith(
       toolInput,
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("waits for and returns the final AirUX review result", async () => {
+    const getReview = vi.fn(async () => ({
+      review_id: REVIEW_ID,
+      review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+      status: "changes_requested" as const,
+      decision: {
+        outcome: "changes_requested" as const,
+        comment: "The menu overlaps the heading.",
+        created_at: "2026-08-20T22:10:00.000Z",
+      },
+    }));
+    const client = await connect(
+      vi.fn(async () => ({
+        review_id: REVIEW_ID,
+        review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+        status: "pending" as const,
+      })),
+      getReview,
+    );
+
+    const result = await client.callTool({
+      arguments: { review_id: REVIEW_ID },
+      name: "airux_get_review",
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      review_id: REVIEW_ID,
+      status: "changes_requested",
+      decision: { comment: "The menu overlaps the heading." },
+    });
+    expect(result.content).toEqual([
+      {
+        text: `AirUX review changes requested:\nhttps://airux.example/reviews/${REVIEW_ID}\nFeedback: The menu overlaps the heading.`,
+        type: "text",
+      },
+    ]);
+    expect(getReview).toHaveBeenCalledWith(
+      { review_id: REVIEW_ID },
       expect.any(AbortSignal),
     );
   });
