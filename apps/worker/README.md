@@ -87,6 +87,10 @@ Evidence, then verifies that Stream reports the video as ready and protected by
 signed URLs. It returns a `no-store` Stream player credential scoped to that
 video for 15 minutes. Cancelled, expired, deleted, foreign, and missing playback
 resources all fail without exposing the Stream video ID or owner ID.
+The browser Content Security Policy permits Stream player frames from
+`https://*.cloudflarestream.com`; the playback response and browser parser
+still require the narrower `customer-<code>.cloudflarestream.com` player
+origin before embedding a signed credential.
 
 Authenticated agents manage their own Reviews through:
 
