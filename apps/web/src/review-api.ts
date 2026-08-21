@@ -1,10 +1,12 @@
 import type {
+  DecisionRequest,
   ReviewCriterion,
   ReviewerReview,
   ReviewerReviewDecision,
   ReviewerReviewEvidence,
   StreamPlayback,
 } from "@airux/shared/v1";
+import { CONTRACT_LIMITS } from "@airux/shared/v1/limits";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,7 +34,12 @@ type Fetcher = (
   init?: RequestInit,
 ) => Promise<Response>;
 
-export class ReviewApiError extends Error {}
+export class ReviewApiError extends Error {
+  constructor(readonly status: number | null = null) {
+    super();
+    this.name = "ReviewApiError";
+  }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -255,13 +262,36 @@ function authorizationHeaders(accessToken: string) {
 
 async function readResponse(response: Response) {
   if (!response.ok) {
-    throw new ReviewApiError();
+    throw new ReviewApiError(response.status);
   }
   try {
     return await response.json();
   } catch {
     throw new ReviewApiError();
   }
+}
+
+function normalizeDecisionRequest(decision: DecisionRequest) {
+  if (
+    !Number.isInteger(decision.expected_version) ||
+    decision.expected_version < 0 ||
+    !isDecisionOutcome(decision.outcome) ||
+    (decision.comment !== undefined &&
+      (typeof decision.comment !== "string" ||
+        decision.comment.trim().length < 1 ||
+        decision.comment.trim().length > CONTRACT_LIMITS.commentLength))
+  ) {
+    throw new ReviewApiError();
+  }
+  const comment = decision.comment?.trim();
+  if (decision.outcome === "changes_requested" && comment === undefined) {
+    throw new ReviewApiError();
+  }
+  return {
+    expected_version: decision.expected_version,
+    outcome: decision.outcome,
+    ...(comment === undefined ? {} : { comment }),
+  } satisfies DecisionRequest;
 }
 
 function requireIdentifier(value: string) {
@@ -315,4 +345,43 @@ export async function createReviewPlayback(
     throw new ReviewApiError();
   }
   return playback;
+}
+
+export async function submitReviewDecision(
+  reviewId: string,
+  accessToken: string,
+  decision: DecisionRequest,
+  fetcher: Fetcher = fetch,
+) {
+  const normalizedDecision = normalizeDecisionRequest(decision);
+  const response = await fetcher(
+    `/api/v1/reviews/${requireIdentifier(reviewId)}/decision`,
+    {
+      method: "POST",
+      headers: {
+        ...authorizationHeaders(accessToken),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(normalizedDecision),
+    },
+  );
+  const body: unknown = await readResponse(response);
+  if (!isRecord(body) || !hasExactKeys(body, ["review"])) {
+    throw new ReviewApiError();
+  }
+  const review = parseReview(body.review);
+  const expectedComment = normalizedDecision.comment ?? null;
+  if (
+    review === null ||
+    review.id !== reviewId ||
+    review.status !== normalizedDecision.outcome ||
+    review.version !== normalizedDecision.expected_version + 1 ||
+    review.resolved_at === null ||
+    review.decision === null ||
+    review.decision.outcome !== normalizedDecision.outcome ||
+    review.decision.comment !== expectedComment
+  ) {
+    throw new ReviewApiError();
+  }
+  return review;
 }
