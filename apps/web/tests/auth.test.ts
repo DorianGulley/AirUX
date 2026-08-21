@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  getOAuthCallbackCleanupPath,
+  getOAuthRedirectUrl,
   getReviewerAuthOptions,
   getReviewerDisplayName,
   getSessionDisplayName,
@@ -46,5 +48,25 @@ describe("reviewer authentication", () => {
 
   it("returns no display name for a signed-out session", () => {
     expect(getSessionDisplayName(null)).toBeNull();
+  });
+
+  it("preserves the Review route while removing OAuth callback parameters", () => {
+    const currentUrl =
+      "https://airux.app/reviews/rvw_123?fixture=error&code=oauth-code&error_description=private#evidence";
+
+    expect(getOAuthRedirectUrl(currentUrl)).toBe(
+      "https://airux.app/reviews/rvw_123?fixture=error#evidence",
+    );
+    expect(getOAuthCallbackCleanupPath(currentUrl)).toBe(
+      "/reviews/rvw_123?fixture=error#evidence",
+    );
+  });
+
+  it("does not rewrite a URL without OAuth callback parameters", () => {
+    expect(
+      getOAuthCallbackCleanupPath(
+        "https://airux.app/reviews/rvw_123?fixture=ready",
+      ),
+    ).toBeNull();
   });
 });
