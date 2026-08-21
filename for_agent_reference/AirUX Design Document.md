@@ -616,7 +616,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
-| M5-1 | Review UI shell | Build the responsive Review route with fixture data and loading/error states. | Not Started | M1-3 |
+| M5-1 | Review UI shell | Build the responsive Review route with fixture data and loading/error states. | Completed | M1-3 |
 | M5-2 | Review presentation | Display the title, claim, criteria, status, and decision controls. | Not Started | M5-1 |
 | M5-3 | UI authentication | Connect the web application to reviewer sign-in and protected Review routes. | Not Started | M2-1, M5-1 |
 | M5-4 | Private playback | Issue short-lived playback tokens and play video directly from Stream. | Not Started | M3-3, M4-4, M5-2, M5-3 |

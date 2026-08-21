@@ -377,3 +377,351 @@ input:focus-visible {
     align-items: start;
   }
 }
+
+.review-body {
+  display: block;
+  min-height: 100vh;
+  color: #172016;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(180 207 171 / 32%),
+      transparent 34rem
+    ),
+    #edf2e9;
+}
+
+.review-site-header {
+  display: flex;
+  width: min(calc(100% - 3rem), 74rem);
+  min-height: 5.5rem;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgb(120 143 115 / 34%);
+}
+
+.review-wordmark {
+  color: #172016;
+  font-size: 1.2rem;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+
+.review-wordmark:focus-visible,
+.review-home-action:focus-visible {
+  border-radius: 0.3rem;
+  outline: 3px solid #7ead74;
+  outline-offset: 4px;
+}
+
+.review-site-context {
+  margin: 0;
+  color: #5a6757;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-state-shell {
+  width: min(calc(100% - 3rem), 74rem);
+  margin: 0 auto;
+  padding: clamp(2.75rem, 7vw, 5.5rem) 0 4rem;
+}
+
+.review-heading {
+  max-width: 49rem;
+}
+
+.review-heading .eyebrow {
+  margin-bottom: 0.85rem;
+}
+
+.review-title {
+  max-width: 17ch;
+  font-size: clamp(2.5rem, 6.5vw, 5rem);
+  line-height: 0.98;
+}
+
+.review-introduction {
+  max-width: 38rem;
+  margin: 1.25rem 0 0;
+  color: #526050;
+  font-size: clamp(1rem, 1.8vw, 1.16rem);
+  line-height: 1.6;
+}
+
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(17rem, 0.75fr);
+  gap: 1.25rem;
+  margin-top: clamp(2.25rem, 5vw, 4rem);
+  align-items: start;
+}
+
+.review-panel {
+  border: 1px solid #cbd7c6;
+  border-radius: 1.35rem;
+  background: rgb(251 253 249 / 94%);
+  box-shadow: 0 1.5rem 4rem rgb(33 54 30 / 8%);
+}
+
+.review-evidence-panel {
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.review-detail-panel {
+  padding: clamp(1.5rem, 3vw, 2rem);
+}
+
+.review-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.2rem 0.15rem 1rem;
+}
+
+.review-panel h2 {
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+}
+
+.review-kind {
+  color: #60705d;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.review-video-shell {
+  overflow: hidden;
+  border: 1px solid #bfcbb9;
+  border-radius: 0.9rem;
+  background: #dce6d8;
+}
+
+.review-browser-bar {
+  display: flex;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.75rem;
+  border-bottom: 1px solid #c1cdbc;
+  background: #f4f7f2;
+}
+
+.review-browser-bar span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #9dac98;
+}
+
+.review-video-placeholder {
+  display: grid;
+  min-height: clamp(18rem, 44vw, 35rem);
+  padding: 2rem;
+  place-content: center;
+  justify-items: center;
+  color: #f8fbf6;
+  background:
+    linear-gradient(145deg, rgb(26 45 24 / 88%), rgb(59 87 53 / 78%)), #21391e;
+  text-align: center;
+}
+
+.review-video-placeholder p {
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.review-play-mark {
+  display: grid;
+  width: 4rem;
+  height: 4rem;
+  padding-left: 0.2rem;
+  place-items: center;
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(255 255 255 / 12%);
+  font-size: 1.2rem;
+}
+
+.review-detail-copy {
+  margin: 1rem 0 0;
+  color: #536151;
+  line-height: 1.62;
+}
+
+.review-boundary {
+  margin: 2rem 0 0;
+  padding: 1rem;
+  border-left: 3px solid #84a47d;
+  border-radius: 0 0.65rem 0.65rem 0;
+  color: #3e4c3b;
+  background: #edf3e9;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.review-loading-heading {
+  display: grid;
+  gap: 1rem;
+  max-width: 44rem;
+}
+
+.review-skeleton {
+  display: block;
+  border-radius: 0.45rem;
+  background: linear-gradient(90deg, #dce5d8 25%, #edf2e9 50%, #dce5d8 75%);
+  background-size: 200% 100%;
+  animation: review-loading-shimmer 1.5s ease-in-out infinite;
+}
+
+.review-skeleton-short {
+  width: 7rem;
+  height: 0.75rem;
+}
+
+.review-skeleton-title {
+  width: min(100%, 38rem);
+  height: clamp(3.2rem, 7vw, 5rem);
+}
+
+.review-skeleton-label {
+  width: 7.5rem;
+  height: 1rem;
+}
+
+.review-skeleton-video {
+  min-height: clamp(20rem, 47vw, 37rem);
+  margin-top: 1rem;
+}
+
+.review-skeleton-line,
+.review-skeleton-line-short {
+  height: 0.85rem;
+  margin-top: 1rem;
+}
+
+.review-skeleton-line-short {
+  width: 68%;
+}
+
+.review-error {
+  display: grid;
+  min-height: calc(100vh - 5.5rem);
+  place-items: center;
+  padding-top: 2rem;
+}
+
+.review-error-card {
+  width: min(100%, 39rem);
+  padding: clamp(2rem, 6vw, 4rem);
+  border: 1px solid #d7c8c4;
+  border-radius: 1.5rem;
+  background: #fffdfa;
+  box-shadow: 0 1.5rem 4rem rgb(67 40 31 / 10%);
+}
+
+.review-error-marker {
+  margin: 0 0 1rem;
+  color: #94372f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.review-error-title {
+  max-width: 13ch;
+  font-size: clamp(2.25rem, 7vw, 3.8rem);
+}
+
+.review-error-copy {
+  max-width: 31rem;
+  margin: 1.25rem 0 0;
+  color: #625b57;
+  line-height: 1.6;
+}
+
+.review-home-action {
+  display: inline-flex;
+  min-height: 2.85rem;
+  margin-top: 2rem;
+  padding: 0.72rem 1.15rem;
+  align-items: center;
+  border-radius: 0.75rem;
+  color: #fff;
+  background: #21391e;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.review-home-action:hover {
+  background: #34542f;
+}
+
+@keyframes review-loading-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 52rem) {
+  .review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .review-detail-panel {
+    order: -1;
+  }
+}
+
+@media (max-width: 36rem) {
+  .review-site-header,
+  .review-state-shell {
+    width: min(calc(100% - 2rem), 74rem);
+  }
+
+  .review-site-header {
+    min-height: 4.5rem;
+  }
+
+  .review-state-shell {
+    padding-top: 2.25rem;
+  }
+
+  .review-title {
+    font-size: clamp(2.25rem, 13vw, 3.4rem);
+  }
+
+  .review-layout {
+    margin-top: 2rem;
+  }
+
+  .review-panel {
+    border-radius: 1rem;
+  }
+
+  .review-video-placeholder {
+    min-height: 15rem;
+  }
+
+  .review-error {
+    min-height: calc(100vh - 4.5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-skeleton {
+    animation: none;
+  }
+}

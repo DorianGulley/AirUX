@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --format=esm --minify --outfile=public/main.js"
+    "build": "esbuild src/bootstrap.ts --bundle --format=esm --minify --outfile=public/main.js"
   },
   "dependencies": {
     "@airux/shared": "workspace:*",
