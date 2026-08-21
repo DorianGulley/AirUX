@@ -1,4 +1,7 @@
+import type { ReviewerReview } from "@airux/shared/v1";
+
 import { getReviewFixtureMode, loadReviewFixture } from "./review-fixture.js";
+import { getReviewStatusLabel } from "./review-presentation.js";
 import type { ReviewRoute } from "./review-route.js";
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
@@ -69,7 +72,78 @@ function createLoadingState() {
   return main;
 }
 
-function createReadyState(title: string) {
+function createReviewDetails(review: ReviewerReview) {
+  const details = createElement("aside", "review-panel review-detail-panel");
+  details.setAttribute("aria-label", "Review details and decision");
+
+  const statusRow = createElement("div", "review-status-row");
+  const statusLabel = createElement("span", "review-status-label");
+  statusLabel.textContent = "Review status";
+  const status = createElement("span", "review-status");
+  status.dataset.status = review.status;
+  status.textContent = getReviewStatusLabel(review.status);
+  statusRow.append(statusLabel, status);
+
+  const claim = createElement("section", "review-detail-section");
+  claim.setAttribute("aria-labelledby", "claim-title");
+  const claimTitle = createElement("h2");
+  claimTitle.id = "claim-title";
+  claimTitle.textContent = "Agent’s claim";
+  const claimCopy = createElement("p", "review-claim");
+  claimCopy.textContent = review.claim;
+  claim.append(claimTitle, claimCopy);
+
+  const criteria = createElement("section", "review-detail-section");
+  criteria.setAttribute("aria-labelledby", "criteria-title");
+  const criteriaTitle = createElement("h2");
+  criteriaTitle.id = "criteria-title";
+  criteriaTitle.textContent = "What to check";
+  const criteriaList = createElement("ol", "review-criteria");
+  for (const criterion of review.criteria) {
+    const item = createElement("li");
+    item.textContent = criterion.prompt;
+    criteriaList.append(item);
+  }
+  criteria.append(criteriaTitle, criteriaList);
+
+  const boundary = createElement("p", "review-boundary");
+  boundary.textContent =
+    "Approval applies only to this claim and the evidence shown.";
+
+  const decision = createElement("section", "review-decision");
+  decision.setAttribute("aria-labelledby", "decision-title");
+  const decisionTitle = createElement("h2");
+  decisionTitle.id = "decision-title";
+  decisionTitle.textContent = "Your decision";
+  const decisionHint = createElement("p", "review-decision-hint");
+  decisionHint.id = "decision-hint";
+  decisionHint.textContent =
+    "Decision submission is not yet available in this fixture preview.";
+  const decisionActions = createElement("div", "review-decision-actions");
+  const approveButton = createElement(
+    "button",
+    "review-decision-button review-approve-action",
+  );
+  approveButton.type = "button";
+  approveButton.disabled = true;
+  approveButton.setAttribute("aria-describedby", decisionHint.id);
+  approveButton.textContent = "Approve";
+  const requestChangesButton = createElement(
+    "button",
+    "review-decision-button review-changes-action",
+  );
+  requestChangesButton.type = "button";
+  requestChangesButton.disabled = true;
+  requestChangesButton.setAttribute("aria-describedby", decisionHint.id);
+  requestChangesButton.textContent = "Request changes";
+  decisionActions.append(approveButton, requestChangesButton);
+  decision.append(decisionTitle, decisionActions, decisionHint);
+
+  details.append(statusRow, claim, criteria, boundary, decision);
+  return details;
+}
+
+function createReadyState(review: ReviewerReview) {
   const main = createElement("main", "review-state-shell");
   main.dataset.reviewState = "ready";
 
@@ -77,7 +151,7 @@ function createReadyState(title: string) {
   const eyebrow = createElement("p", "eyebrow");
   eyebrow.textContent = "Review request";
   const titleElement = createElement("h1", "review-title");
-  titleElement.textContent = title;
+  titleElement.textContent = review.title;
   const introduction = createElement("p", "review-introduction");
   introduction.textContent =
     "An agent has prepared focused evidence for your judgment.";
@@ -113,20 +187,7 @@ function createReadyState(title: string) {
   evidenceFrame.append(browserBar, evidencePlaceholder);
   evidence.append(evidenceHeading, evidenceFrame);
 
-  const details = createElement("aside", "review-panel review-detail-panel");
-  details.setAttribute("aria-labelledby", "details-title");
-  const detailsTitle = createElement("h2");
-  detailsTitle.id = "details-title";
-  detailsTitle.textContent = "Review details";
-  const detailsCopy = createElement("p", "review-detail-copy");
-  detailsCopy.textContent =
-    "The claim, review criteria, status, and decision controls will be presented alongside the evidence.";
-  const boundary = createElement("p", "review-boundary");
-  boundary.textContent =
-    "Approval applies only to the stated claim and the evidence shown.";
-  details.append(detailsTitle, detailsCopy, boundary);
-
-  layout.append(evidence, details);
+  layout.append(evidence, createReviewDetails(review));
   main.append(heading, layout);
   return main;
 }
@@ -171,7 +232,7 @@ export async function initializeReviewPage(
       getReviewFixtureMode(searchParams),
     );
     document.title = `${review.title} | AirUX`;
-    renderPageState(createReadyState(review.title));
+    renderPageState(createReadyState(review));
   } catch {
     document.title = "Review unavailable | AirUX";
     renderPageState(createErrorState());
