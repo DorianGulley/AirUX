@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'none'; connect-src 'self' http://127.0.0.1:54321 https://rulojrgnyibmjgsgqlys.supabase.co; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'
+  Content-Security-Policy: default-src 'self'; base-uri 'none'; connect-src 'self' http://127.0.0.1:54321 https://rulojrgnyibmjgsgqlys.supabase.co; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src https://*.cloudflarestream.com; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   Permissions-Policy: camera=(), geolocation=(), microphone=()
