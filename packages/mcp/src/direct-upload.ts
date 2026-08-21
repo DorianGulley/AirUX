@@ -36,6 +36,7 @@ export interface DirectUploadDependencies {
   ) => Promise<unknown>;
   readonly now?: () => Date;
   readonly openFile?: (path: string, mediaType: string) => Promise<Blob>;
+  readonly signal?: AbortSignal;
   readonly sleep?: (durationMs: number, signal: AbortSignal) => Promise<void>;
 }
 
@@ -152,6 +153,7 @@ async function uploadRecording(
   now: Date,
   fetcher: Fetcher,
   openFile: (path: string, mediaType: string) => Promise<Blob>,
+  signal?: AbortSignal,
 ) {
   let file: Blob;
   try {
@@ -173,6 +175,10 @@ async function uploadRecording(
   const body = new FormData();
   body.set("file", file, basename(recording.filePath));
   const controller = new AbortController();
+  const uploadSignal =
+    signal === undefined
+      ? controller.signal
+      : AbortSignal.any([controller.signal, signal]);
   const expiryTimer = setTimeout(
     () => controller.abort(),
     expiresAt.getTime() - now.getTime(),
@@ -184,7 +190,7 @@ async function uploadRecording(
       method: "POST",
       body,
       redirect: "manual",
-      signal: controller.signal,
+      signal: uploadSignal,
     });
   } catch (error) {
     throw new DirectUploadError("upload", "Stream direct upload failed", {
@@ -225,6 +231,10 @@ async function waitForProcessing(
 ) {
   const sleep = dependencies.sleep ?? defaultSleep;
   const controller = new AbortController();
+  const signal =
+    dependencies.signal === undefined
+      ? controller.signal
+      : AbortSignal.any([controller.signal, dependencies.signal]);
   const startedAt = currentTime(now).getTime();
   const deadline = startedAt + PROCESSING_TIMEOUT_MS;
   const timeout = setTimeout(() => controller.abort(), PROCESSING_TIMEOUT_MS);
@@ -234,15 +244,9 @@ async function waitForProcessing(
     while (true) {
       let value: unknown;
       try {
-        value = await dependencies.getReview(
-          assignment.review_id,
-          controller.signal,
-        );
+        value = await dependencies.getReview(assignment.review_id, signal);
       } catch (error) {
-        if (
-          controller.signal.aborted ||
-          currentTime(now).getTime() >= deadline
-        ) {
+        if (signal.aborted || currentTime(now).getTime() >= deadline) {
           throw new DirectUploadError(
             "confirmation",
             "Timed out waiting for Stream processing",
@@ -279,7 +283,7 @@ async function waitForProcessing(
         );
       }
       try {
-        await sleep(Math.min(delay, remaining), controller.signal);
+        await sleep(Math.min(delay, remaining), signal);
       } catch (error) {
         throw new DirectUploadError(
           "confirmation",
@@ -292,6 +296,21 @@ async function waitForProcessing(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function waitForBrowserRecordingProcessing(
+  input: unknown,
+  dependencies: DirectUploadDependencies,
+) {
+  const parsed = createReviewResponseSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new DirectUploadError(
+      "validation",
+      "Invalid Stream direct-upload assignment",
+    );
+  }
+  const now = dependencies.now ?? (() => new Date());
+  return waitForProcessing(parsed.data, dependencies, now);
 }
 
 export async function uploadBrowserRecording(
@@ -314,6 +333,7 @@ export async function uploadBrowserRecording(
     current,
     dependencies.fetcher ?? fetch,
     dependencies.openFile ?? defaultOpenFile,
+    dependencies.signal,
   );
   const review = await waitForProcessing(assignment, dependencies, now);
 

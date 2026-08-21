@@ -16,6 +16,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "mcp:browser:install": "pnpm --filter @airux/mcp run browser:install",
+    "mcp:start": "pnpm --filter @airux/mcp run start",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",
     "typecheck": "tsc --build",

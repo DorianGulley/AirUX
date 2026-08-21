@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import { capturePlanSchema } from "./capture.js";
 import {
   identifierSchema,
   nonNegativeIntegerSchema,
@@ -93,6 +93,19 @@ export const createReviewResponseSchema = z
     evidence_id: identifierSchema,
     upload_url: z.url(),
     upload_expires_at: utcTimestampSchema,
+  })
+  .strict();
+
+export const createReviewToolInputSchema = createReviewRequestSchema
+  .omit({ evidence: true })
+  .extend({ capture_plan: capturePlanSchema })
+  .strict();
+
+export const createReviewToolOutputSchema = z
+  .object({
+    review_id: identifierSchema,
+    review_url: z.url(),
+    status: z.literal("pending"),
   })
   .strict();
 
@@ -339,6 +352,10 @@ export type BrowserVideoEvidenceInput = z.infer<
 >;
 export type CreateReviewRequest = z.infer<typeof createReviewRequestSchema>;
 export type CreateReviewResponse = z.infer<typeof createReviewResponseSchema>;
+export type CreateReviewToolInput = z.infer<typeof createReviewToolInputSchema>;
+export type CreateReviewToolOutput = z.infer<
+  typeof createReviewToolOutputSchema
+>;
 export type AgentReviewEvidence = z.infer<typeof agentReviewEvidenceSchema>;
 export type AgentReviewDecision = z.infer<typeof agentReviewDecisionSchema>;
 export type AgentReviewSummary = z.infer<typeof agentReviewSummarySchema>;
