@@ -1,5 +1,18 @@
 import type { ReviewerReview } from "@airux/shared/v1";
+import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  createReviewerAuthClient,
+  getOAuthCallbackCleanupPath,
+  getSessionDisplayName,
+} from "./auth.js";
+import { loadBrowserConfig } from "./browser-config.js";
+import {
+  observeReviewSession,
+  restoreReviewSession,
+  signInToReview,
+  signOutFromReview,
+} from "./review-auth.js";
 import { getReviewFixtureMode, loadReviewFixture } from "./review-fixture.js";
 import { getReviewStatusLabel } from "./review-presentation.js";
 import type { ReviewRoute } from "./review-route.js";
@@ -15,16 +28,42 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
-function createBrandHeader() {
+interface ReviewHeaderAccount {
+  readonly displayName: string;
+  readonly onSignOut: (
+    button: HTMLButtonElement,
+    status: HTMLParagraphElement,
+  ) => void;
+}
+
+function createBrandHeader(account?: ReviewHeaderAccount) {
   const header = createElement("header", "review-site-header");
   const homeLink = createElement("a", "review-wordmark");
   homeLink.href = "/";
   homeLink.textContent = "AirUX";
   homeLink.setAttribute("aria-label", "AirUX home");
 
-  const context = createElement("p", "review-site-context");
-  context.textContent = "Human review";
-  header.append(homeLink, context);
+  if (account === undefined) {
+    const context = createElement("p", "review-site-context");
+    context.textContent = "Human review";
+    header.append(homeLink, context);
+    return header;
+  }
+
+  const accountPanel = createElement("div", "review-account");
+  const identity = createElement("p", "review-account-name");
+  identity.textContent = account.displayName;
+  const signOutButton = createElement("button", "review-sign-out");
+  signOutButton.type = "button";
+  signOutButton.textContent = "Sign out";
+  const status = createElement("p", "review-account-status");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  signOutButton.addEventListener("click", () => {
+    account.onSignOut(signOutButton, status);
+  });
+  accountPanel.append(identity, signOutButton, status);
+  header.append(homeLink, accountPanel);
   return header;
 }
 
@@ -214,8 +253,69 @@ function createErrorState() {
   return main;
 }
 
-function renderPageState(state: HTMLElement) {
-  document.body.replaceChildren(createBrandHeader(), state);
+function createSignInState(
+  onSignIn: (button: HTMLButtonElement, status: HTMLParagraphElement) => void,
+) {
+  const main = createElement("main", "review-state-shell review-auth-state");
+  main.dataset.reviewState = "signed-out";
+  const card = createElement("section", "review-auth-card");
+  card.setAttribute("aria-labelledby", "review-auth-title");
+
+  const marker = createElement("p", "eyebrow");
+  marker.textContent = "Private review";
+  const title = createElement("h1", "review-auth-title");
+  title.id = "review-auth-title";
+  title.textContent = "Sign in to review this work.";
+  const copy = createElement("p", "review-auth-copy");
+  copy.textContent =
+    "Review links identify the work to inspect, but they do not grant access to its private evidence.";
+  const button = createElement("button", "primary-action review-sign-in");
+  button.type = "button";
+  button.textContent = "Continue with GitHub";
+  const status = createElement("p", "review-auth-status");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
+  const note = createElement("p", "review-auth-note");
+  note.textContent = "After signing in, you’ll return directly to this Review.";
+  button.addEventListener("click", () => {
+    onSignIn(button, status);
+  });
+  card.append(marker, title, copy, button, status, note);
+  main.append(card);
+  return main;
+}
+
+function createAuthErrorState(retryHref: string) {
+  const main = createElement("main", "review-state-shell review-auth-state");
+  main.dataset.reviewState = "auth-error";
+  const card = createElement("section", "review-auth-card");
+  card.setAttribute("aria-labelledby", "review-auth-error-title");
+
+  const marker = createElement("p", "review-error-marker");
+  marker.textContent = "Sign-in unavailable";
+  const title = createElement("h1", "review-auth-title");
+  title.id = "review-auth-error-title";
+  title.textContent = "We couldn’t verify your session.";
+  const copy = createElement("p", "review-auth-copy");
+  copy.textContent =
+    "Your Review remains private. Try again when sign-in is available.";
+  const retry = createElement("a", "review-home-action");
+  retry.href = retryHref;
+  retry.textContent = "Try again";
+  card.append(marker, title, copy, retry);
+  main.append(card);
+  return main;
+}
+
+function renderPageState(state: HTMLElement, account?: ReviewHeaderAccount) {
+  document.body.replaceChildren(createBrandHeader(account), state);
+}
+
+function clearOAuthParameters() {
+  const cleanPath = getOAuthCallbackCleanupPath(window.location.href);
+  if (cleanPath !== null) {
+    window.history.replaceState({}, "", cleanPath);
+  }
 }
 
 export async function initializeReviewPage(
@@ -225,16 +325,86 @@ export async function initializeReviewPage(
   document.body.classList.add("review-body");
   document.title = "Review | AirUX";
   renderPageState(createLoadingState());
+  let authClient: SupabaseClient | undefined;
+  let renderSequence = 0;
+
+  const renderSession = async (session: Session | null) => {
+    const sequence = ++renderSequence;
+    if (session === null) {
+      document.title = "Sign in to review | AirUX";
+      renderPageState(
+        createSignInState((button, status) => {
+          if (authClient === undefined) {
+            return;
+          }
+          button.disabled = true;
+          status.textContent = "Redirecting to GitHub…";
+          void signInToReview(authClient.auth, window.location.href).catch(
+            () => {
+              button.disabled = false;
+              status.textContent =
+                "GitHub sign-in could not be started. Please try again.";
+            },
+          );
+        }),
+      );
+      return;
+    }
+
+    const account = {
+      displayName: getSessionDisplayName(session) ?? "GitHub user",
+      onSignOut: (button: HTMLButtonElement, status: HTMLParagraphElement) => {
+        if (authClient === undefined) {
+          return;
+        }
+        button.disabled = true;
+        status.textContent = "Signing out…";
+        void signOutFromReview(authClient.auth)
+          .then(() => renderSession(null))
+          .catch(() => {
+            button.disabled = false;
+            status.textContent = "Sign-out failed. Please try again.";
+          });
+      },
+    } satisfies ReviewHeaderAccount;
+    renderPageState(createLoadingState(), account);
+
+    try {
+      const review = await loadReviewFixture(
+        route.reviewId,
+        getReviewFixtureMode(searchParams),
+      );
+      if (sequence !== renderSequence) {
+        return;
+      }
+      document.title = `${review.title} | AirUX`;
+      renderPageState(createReadyState(review), account);
+    } catch {
+      if (sequence !== renderSequence) {
+        return;
+      }
+      document.title = "Review unavailable | AirUX";
+      renderPageState(createErrorState(), account);
+    }
+  };
 
   try {
-    const review = await loadReviewFixture(
-      route.reviewId,
-      getReviewFixtureMode(searchParams),
-    );
-    document.title = `${review.title} | AirUX`;
-    renderPageState(createReadyState(review));
+    const config = await loadBrowserConfig();
+    authClient = createReviewerAuthClient(config, window.localStorage);
+    const session = await restoreReviewSession(authClient.auth);
+    clearOAuthParameters();
+    observeReviewSession(authClient.auth, (nextSession) => {
+      void renderSession(nextSession);
+    });
+    await renderSession(session);
   } catch {
-    document.title = "Review unavailable | AirUX";
-    renderPageState(createErrorState());
+    clearOAuthParameters();
+    document.title = "Sign-in unavailable | AirUX";
+    const cleanUrl = new URL(window.location.href);
+    renderPageState(
+      createAuthErrorState(
+        `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`,
+      ),
+    );
   }
 }

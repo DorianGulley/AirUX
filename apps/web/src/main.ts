@@ -1,7 +1,11 @@
 import type { AgentCredential } from "@airux/shared/v1";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
-import { createReviewerAuthClient, getSessionDisplayName } from "./auth.js";
+import {
+  createReviewerAuthClient,
+  getOAuthCallbackCleanupPath,
+  getSessionDisplayName,
+} from "./auth.js";
 import { loadBrowserConfig } from "./browser-config.js";
 import {
   createAgentCredential,
@@ -218,21 +222,9 @@ function renderError(
 }
 
 function clearOAuthParameters() {
-  const url = new URL(window.location.href);
-  const parameters = ["code", "error", "error_code", "error_description"];
-  let changed = false;
-
-  for (const parameter of parameters) {
-    changed = url.searchParams.has(parameter) || changed;
-    url.searchParams.delete(parameter);
-  }
-
-  if (changed) {
-    window.history.replaceState(
-      {},
-      "",
-      `${url.pathname}${url.search}${url.hash}`,
-    );
+  const cleanPath = getOAuthCallbackCleanupPath(window.location.href);
+  if (cleanPath !== null) {
+    window.history.replaceState({}, "", cleanPath);
   }
 }
 

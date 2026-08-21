@@ -425,10 +425,101 @@ input:focus-visible {
   text-transform: uppercase;
 }
 
+.review-account {
+  display: grid;
+  grid-template-columns: minmax(0, auto) auto;
+  align-items: center;
+  justify-items: end;
+  gap: 0.15rem 0.75rem;
+}
+
+.review-account-name,
+.review-account-status {
+  margin: 0;
+}
+
+.review-account-name {
+  max-width: 15rem;
+  overflow: hidden;
+  color: #4d5a4a;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-sign-out {
+  min-height: auto;
+  padding: 0.35rem 0.5rem;
+  color: #3f6a39;
+  background: transparent;
+  font-size: 0.78rem;
+}
+
+.review-sign-out:hover:not(:disabled) {
+  color: #21391e;
+  text-decoration: underline;
+}
+
+.review-account-status {
+  grid-column: 1 / -1;
+  min-height: 0;
+  color: #8c2d26;
+  font-size: 0.72rem;
+}
+
 .review-state-shell {
   width: min(calc(100% - 3rem), 74rem);
   margin: 0 auto;
   padding: clamp(2.75rem, 7vw, 5.5rem) 0 4rem;
+}
+
+.review-auth-state {
+  display: grid;
+  min-height: calc(100vh - 5.5rem);
+  place-items: center;
+  padding-top: 2rem;
+}
+
+.review-auth-card {
+  width: min(100%, 36rem);
+  padding: clamp(2rem, 7vw, 4rem);
+  border: 1px solid #cbd7c6;
+  border-radius: 1.5rem;
+  background: #fbfdf9;
+  box-shadow: 0 1.5rem 4rem rgb(33 54 30 / 10%);
+}
+
+.review-auth-title {
+  max-width: 12ch;
+  font-size: clamp(2.35rem, 7vw, 4rem);
+  line-height: 1;
+}
+
+.review-auth-copy {
+  max-width: 31rem;
+  margin: 1.25rem 0 0;
+  color: #526050;
+  line-height: 1.62;
+}
+
+.review-sign-in {
+  margin-top: 2rem;
+}
+
+.review-auth-status {
+  min-height: 1.3rem;
+  margin: 0.75rem 0 0;
+  color: #a13028;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.review-auth-note {
+  margin: 1.5rem 0 0;
+  color: #687566;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .review-heading {
@@ -814,6 +905,10 @@ input:focus-visible {
     min-height: 4.5rem;
   }
 
+  .review-account-name {
+    max-width: 8rem;
+  }
+
   .review-state-shell {
     padding-top: 2.25rem;
   }
@@ -835,6 +930,10 @@ input:focus-visible {
   }
 
   .review-error {
+    min-height: calc(100vh - 4.5rem);
+  }
+
+  .review-auth-state {
     min-height: calc(100vh - 4.5rem);
   }
 }
