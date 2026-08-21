@@ -20,7 +20,7 @@ const assignment = {
   review_url: `https://airux.example/reviews/${REVIEW_ID}`,
   status: "draft",
   evidence_id: EVIDENCE_ID,
-  upload_url: "https://upload.videodelivery.net/one-time-token",
+  upload_url: "https://upload.cloudflarestream.com/one-time-token",
   upload_expires_at: "2026-08-20T22:15:00.000Z",
 };
 
@@ -199,10 +199,28 @@ describe("uploadBrowserRecording", () => {
     }
   });
 
+  it("accepts Cloudflare Stream's legacy direct-upload origin", async () => {
+    const { recording: artifact } = recording();
+    const uploadDependencies = dependencies();
+    const legacyUploadUrl =
+      "https://upload.videodelivery.net/legacy-one-time-token";
+
+    await uploadBrowserRecording(
+      artifact,
+      { ...assignment, upload_url: legacyUploadUrl },
+      uploadDependencies,
+    );
+
+    expect(String(uploadDependencies.fetcher.mock.calls[0]?.[0])).toBe(
+      legacyUploadUrl,
+    );
+  });
+
   it.each([
     "http://upload.videodelivery.net/token",
     "https://example.com/token",
     "https://upload.videodelivery.net.evil.example/token",
+    "https://upload.cloudflarestream.com.evil.example/token",
     "https://user@upload.videodelivery.net/token",
     "https://upload.videodelivery.net/#token",
   ])("rejects an untrusted upload destination: %s", async (uploadUrl) => {
