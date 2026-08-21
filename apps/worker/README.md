@@ -108,7 +108,8 @@ payload returns the existing draft Review and refreshes its upload slot; using
 the key with different content returns a conflict. Read and cancellation
 operations are scoped to both the authenticated owner and credential, and
 agent-facing responses omit owner IDs, credential IDs, Stream IDs, and deletion
-metadata.
+metadata. Open Review detail responses include `Retry-After` guidance for the
+local MCP client's increasing-interval result poll; terminal responses omit it.
 
 Stream sends processing results to:
 

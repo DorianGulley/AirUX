@@ -189,14 +189,14 @@ export class AiruxApiClient {
         status: response.status,
       });
     }
-    return body;
+    return { body, retryAfterMs: retryAfterMs(response) };
   }
 
   async createReview(
     request: CreateReviewRequest,
     signal: AbortSignal,
   ): Promise<CreateReviewResponse> {
-    const body = await this.#request(
+    const { body } = await this.#request(
       "/api/v1/agent/reviews",
       { body: JSON.stringify(request), method: "POST", signal },
       new Set([200, 201]),
@@ -214,7 +214,12 @@ export class AiruxApiClient {
     reviewId: string,
     signal: AbortSignal,
   ): Promise<GetAgentReviewResponse> {
-    const body = await this.#request(
+    const { review } = await this.getReviewForPolling(reviewId, signal);
+    return { review };
+  }
+
+  async getReviewForPolling(reviewId: string, signal: AbortSignal) {
+    const { body, retryAfterMs: retryDelay } = await this.#request(
       `/api/v1/agent/reviews/${encodeURIComponent(reviewId)}`,
       { method: "GET", signal },
       new Set([200]),
@@ -225,6 +230,9 @@ export class AiruxApiClient {
         retryable: false,
       });
     }
-    return parsed.data;
+    return {
+      review: parsed.data.review,
+      ...(retryDelay === undefined ? {} : { retryAfterMs: retryDelay }),
+    };
   }
 }

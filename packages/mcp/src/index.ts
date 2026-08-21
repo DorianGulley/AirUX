@@ -4,4 +4,5 @@ export * from "./capture-plan-runner.js";
 export * from "./config.js";
 export * from "./create-review.js";
 export * from "./direct-upload.js";
+export * from "./get-review.js";
 export * from "./server.js";

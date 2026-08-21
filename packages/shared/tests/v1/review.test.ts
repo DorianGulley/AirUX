@@ -15,6 +15,8 @@ import {
   evidenceSchema,
   evidenceStateSchema,
   getReviewerReviewResponseSchema,
+  getReviewToolInputSchema,
+  getReviewToolOutputSchema,
   REVIEW_STATES,
   reviewSchema,
   reviewStateSchema,
@@ -162,6 +164,65 @@ describe("airux_create_review tool contracts", () => {
       review_url: "https://airux.app/reviews/rvw_1",
       status: "pending",
     });
+  });
+});
+
+describe("airux_get_review tool contracts", () => {
+  const decision = {
+    outcome: "changes_requested" as const,
+    comment: "The menu overlaps the heading.",
+    created_at: "2026-08-20T08:02:00Z",
+  };
+
+  it("accepts a Review identifier and returns terminal feedback", () => {
+    expect(getReviewToolInputSchema.parse({ review_id: "rvw_1" })).toEqual({
+      review_id: "rvw_1",
+    });
+    expect(
+      getReviewToolOutputSchema.parse({
+        review_id: "rvw_1",
+        review_url: "https://airux.app/reviews/rvw_1",
+        status: "changes_requested",
+        decision,
+      }),
+    ).toEqual({
+      review_id: "rvw_1",
+      review_url: "https://airux.app/reviews/rvw_1",
+      status: "changes_requested",
+      decision,
+    });
+  });
+
+  it("requires decided states to include their matching Decision", () => {
+    expect(
+      getReviewToolOutputSchema.safeParse({
+        review_id: "rvw_1",
+        review_url: "https://airux.app/reviews/rvw_1",
+        status: "approved",
+        decision: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      getReviewToolOutputSchema.safeParse({
+        review_id: "rvw_1",
+        review_url: "https://airux.app/reviews/rvw_1",
+        status: "approved",
+        decision,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("returns cancellation and expiry without a Decision", () => {
+    for (const status of ["cancelled", "expired"] as const) {
+      expect(
+        getReviewToolOutputSchema.safeParse({
+          review_id: "rvw_1",
+          review_url: "https://airux.app/reviews/rvw_1",
+          status,
+          decision: null,
+        }).success,
+      ).toBe(true);
+    }
   });
 });
 

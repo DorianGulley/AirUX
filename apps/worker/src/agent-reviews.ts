@@ -24,6 +24,7 @@ const DATA_ERROR_RESPONSE_LIMIT = 16 * 1024;
 const REQUEST_BODY_LIMIT = 32 * 1024;
 const DRAFT_LIFETIME_MS = 60 * 60 * 1000;
 const UPLOAD_URL_LIFETIME_MS = 15 * 60 * 1000;
+const RESULT_POLL_RETRY_AFTER_SECONDS = 2;
 const MAX_VIDEO_DURATION_SECONDS = CONTRACT_LIMITS.captureDurationMs / 1000;
 const RPC_ERROR_CODE = "P0001";
 const PAYLOAD_CONFLICT_MESSAGE = "client request payload conflict";
@@ -631,15 +632,20 @@ export async function handleAgentReviewGet(
   dependencies: Omit<AgentReviewDependencies, "stream">,
 ) {
   try {
+    const review = await getReview(
+      reviewId,
+      agent,
+      config,
+      dependencies.fetcher ?? fetch,
+    );
     return jsonResponse(
       getAgentReviewResponseSchema.parse({
-        review: await getReview(
-          reviewId,
-          agent,
-          config,
-          dependencies.fetcher ?? fetch,
-        ),
+        review,
       }),
+      200,
+      review.status === "draft" || review.status === "pending"
+        ? { "retry-after": String(RESULT_POLL_RETRY_AFTER_SECONDS) }
+        : undefined,
     );
   } catch (error) {
     return errorResponse(error);

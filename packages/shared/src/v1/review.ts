@@ -109,6 +109,10 @@ export const createReviewToolOutputSchema = z
   })
   .strict();
 
+export const getReviewToolInputSchema = z
+  .object({ review_id: identifierSchema })
+  .strict();
+
 export const agentReviewEvidenceSchema = z
   .object({
     id: identifierSchema,
@@ -140,6 +144,33 @@ export const agentReviewDecisionSchema = z
         code: "custom",
         message: "A comment is required when requesting changes",
         path: ["comment"],
+      });
+    }
+  });
+
+export const getReviewToolOutputSchema = z
+  .object({
+    review_id: identifierSchema,
+    review_url: z.url(),
+    status: z.enum(["approved", "changes_requested", "cancelled", "expired"]),
+    decision: agentReviewDecisionSchema.nullable(),
+  })
+  .strict()
+  .superRefine((result, context) => {
+    const decided =
+      result.status === "approved" || result.status === "changes_requested";
+    if (decided && result.decision?.outcome !== result.status) {
+      context.addIssue({
+        code: "custom",
+        message: "A decided Review requires its matching Decision",
+        path: ["decision"],
+      });
+    }
+    if (!decided && result.decision !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "An undecided terminal Review cannot include a Decision",
+        path: ["decision"],
       });
     }
   });
@@ -384,6 +415,8 @@ export type CreateReviewToolInput = z.infer<typeof createReviewToolInputSchema>;
 export type CreateReviewToolOutput = z.infer<
   typeof createReviewToolOutputSchema
 >;
+export type GetReviewToolInput = z.infer<typeof getReviewToolInputSchema>;
+export type GetReviewToolOutput = z.infer<typeof getReviewToolOutputSchema>;
 export type AgentReviewEvidence = z.infer<typeof agentReviewEvidenceSchema>;
 export type AgentReviewDecision = z.infer<typeof agentReviewDecisionSchema>;
 export type AgentReviewSummary = z.infer<typeof agentReviewSummarySchema>;
