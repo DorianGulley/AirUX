@@ -11,7 +11,10 @@ import {
 
 import type { TemporaryBrowserRecording } from "./browser-recording.js";
 
-const STREAM_UPLOAD_ORIGIN = "https://upload.videodelivery.net";
+const STREAM_UPLOAD_ORIGINS = new Set([
+  "https://upload.cloudflarestream.com",
+  "https://upload.videodelivery.net",
+]);
 const PROCESSING_TIMEOUT_MS = 5 * 60 * 1000;
 const INITIAL_POLL_DELAY_MS = 1_000;
 const MAX_POLL_DELAY_MS = 10_000;
@@ -77,7 +80,7 @@ function validateUpload(
 
   const uploadUrl = new URL(parsed.data.upload_url);
   if (
-    uploadUrl.origin !== STREAM_UPLOAD_ORIGIN ||
+    !STREAM_UPLOAD_ORIGINS.has(uploadUrl.origin) ||
     uploadUrl.username.length > 0 ||
     uploadUrl.password.length > 0 ||
     uploadUrl.hash.length > 0 ||
