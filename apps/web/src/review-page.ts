@@ -1,4 +1,4 @@
-import type { ReviewerReview } from "@airux/shared/v1";
+import type { ReviewerReview, StreamPlayback } from "@airux/shared/v1";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -7,6 +7,7 @@ import {
   getSessionDisplayName,
 } from "./auth.js";
 import { loadBrowserConfig } from "./browser-config.js";
+import { createReviewPlayback, getReviewerReview } from "./review-api.js";
 import {
   observeReviewSession,
   restoreReviewSession,
@@ -157,7 +158,7 @@ function createReviewDetails(review: ReviewerReview) {
   const decisionHint = createElement("p", "review-decision-hint");
   decisionHint.id = "decision-hint";
   decisionHint.textContent =
-    "Decision submission is not yet available in this fixture preview.";
+    "Decision submission will be connected in the next milestone.";
   const decisionActions = createElement("div", "review-decision-actions");
   const approveButton = createElement(
     "button",
@@ -182,7 +183,51 @@ function createReviewDetails(review: ReviewerReview) {
   return details;
 }
 
-function createReadyState(review: ReviewerReview) {
+function createPlaybackFrame(
+  review: ReviewerReview,
+  playback: StreamPlayback | "unavailable" | null,
+) {
+  const evidenceFrame = createElement("div", "review-video-shell");
+  const browserBar = createElement("div", "review-browser-bar");
+  browserBar.setAttribute("aria-hidden", "true");
+  for (let index = 0; index < 3; index += 1) {
+    browserBar.append(createElement("span"));
+  }
+
+  if (typeof playback === "object" && playback !== null) {
+    const player = createElement("iframe", "review-stream-player");
+    player.src = playback.player_url;
+    player.title = `Video evidence for ${review.title}`;
+    player.allow =
+      "accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture";
+    player.allowFullscreen = true;
+    player.referrerPolicy = "no-referrer";
+    evidenceFrame.append(browserBar, player);
+    return evidenceFrame;
+  }
+
+  const evidencePlaceholder = createElement("div", "review-video-placeholder");
+  const playMark = createElement("span", "review-play-mark");
+  playMark.textContent = playback === "unavailable" ? "!" : "▶";
+  playMark.setAttribute("aria-hidden", "true");
+  const placeholderText = createElement("p");
+  if (playback === "unavailable") {
+    placeholderText.textContent =
+      "Private playback is temporarily unavailable. Reload to try again.";
+  } else if (review.evidence.status !== "ready") {
+    placeholderText.textContent = "Video evidence is not ready for playback.";
+  } else {
+    placeholderText.textContent = "Private playback will appear here";
+  }
+  evidencePlaceholder.append(playMark, placeholderText);
+  evidenceFrame.append(browserBar, evidencePlaceholder);
+  return evidenceFrame;
+}
+
+function createReadyState(
+  review: ReviewerReview,
+  playback: StreamPlayback | "unavailable" | null,
+) {
   const main = createElement("main", "review-state-shell");
   main.dataset.reviewState = "ready";
 
@@ -210,21 +255,7 @@ function createReadyState(review: ReviewerReview) {
   evidenceKind.textContent = "Browser recording";
   evidenceHeading.append(evidenceTitle, evidenceKind);
 
-  const evidenceFrame = createElement("div", "review-video-shell");
-  const browserBar = createElement("div", "review-browser-bar");
-  browserBar.setAttribute("aria-hidden", "true");
-  for (let index = 0; index < 3; index += 1) {
-    browserBar.append(createElement("span"));
-  }
-  const evidencePlaceholder = createElement("div", "review-video-placeholder");
-  const playMark = createElement("span", "review-play-mark");
-  playMark.textContent = "▶";
-  playMark.setAttribute("aria-hidden", "true");
-  const placeholderText = createElement("p");
-  placeholderText.textContent = "Private playback will appear here";
-  evidencePlaceholder.append(playMark, placeholderText);
-  evidenceFrame.append(browserBar, evidencePlaceholder);
-  evidence.append(evidenceHeading, evidenceFrame);
+  evidence.append(evidenceHeading, createPlaybackFrame(review, playback));
 
   layout.append(evidence, createReviewDetails(review));
   main.append(heading, layout);
@@ -370,15 +401,27 @@ export async function initializeReviewPage(
     renderPageState(createLoadingState(), account);
 
     try {
-      const review = await loadReviewFixture(
-        route.reviewId,
-        getReviewFixtureMode(searchParams),
-      );
+      const fixtureMode = getReviewFixtureMode(searchParams);
+      const review =
+        fixtureMode === null
+          ? await getReviewerReview(route.reviewId, session.access_token)
+          : await loadReviewFixture(route.reviewId, fixtureMode);
+      let playback: StreamPlayback | "unavailable" | null = null;
+      if (fixtureMode === null && review.evidence.status === "ready") {
+        try {
+          playback = await createReviewPlayback(
+            review.evidence.id,
+            session.access_token,
+          );
+        } catch {
+          playback = "unavailable";
+        }
+      }
       if (sequence !== renderSequence) {
         return;
       }
       document.title = `${review.title} | AirUX`;
-      renderPageState(createReadyState(review), account);
+      renderPageState(createReadyState(review, playback), account);
     } catch {
       if (sequence !== renderSequence) {
         return;

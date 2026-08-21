@@ -12,7 +12,12 @@
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"
   },
   "secrets": {
-    "required": ["SUPABASE_SECRET_KEY", "STREAM_WEBHOOK_SECRET"]
+    "required": [
+      "SUPABASE_SECRET_KEY",
+      "STREAM_SIGNING_JWK",
+      "STREAM_SIGNING_KEY_ID",
+      "STREAM_WEBHOOK_SECRET"
+    ]
   },
   "stream": {
     "binding": "STREAM",
@@ -48,7 +53,12 @@
         "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h4BUC3IlHEvCwwxvBmEG3Q_UwQtQTeG"
       },
       "secrets": {
-        "required": ["SUPABASE_SECRET_KEY", "STREAM_WEBHOOK_SECRET"]
+        "required": [
+          "SUPABASE_SECRET_KEY",
+          "STREAM_SIGNING_JWK",
+          "STREAM_SIGNING_KEY_ID",
+          "STREAM_WEBHOOK_SECRET"
+        ]
       },
       "stream": {
         "binding": "STREAM"

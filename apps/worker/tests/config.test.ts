@@ -14,6 +14,8 @@ describe("loadConfig", () => {
         secretKey: "sb_secret_private-test-value",
       },
       stream: {
+        signingJwk: "eyJrdHkiOiJSU0EifQ==",
+        signingKeyId: "stream-signing-test-key",
         webhookSecret: "stream-webhook-test-secret",
       },
     });
@@ -40,6 +42,8 @@ describe("loadConfig", () => {
       { SUPABASE_PUBLISHABLE_KEY: "public-test-value" },
     ],
     ["SUPABASE_SECRET_KEY", { SUPABASE_SECRET_KEY: "private-test-value" }],
+    ["STREAM_SIGNING_JWK", { STREAM_SIGNING_JWK: "not base64" }],
+    ["STREAM_SIGNING_KEY_ID", { STREAM_SIGNING_KEY_ID: "short" }],
     ["STREAM_WEBHOOK_SECRET", { STREAM_WEBHOOK_SECRET: "short" }],
   ])("rejects an invalid %s binding", (bindingName, override) => {
     expect(() => loadConfig({ ...TEST_ENV, ...override })).toThrow(
@@ -72,6 +76,17 @@ describe("loadConfig", () => {
       loadConfig({ ...TEST_ENV, STREAM_WEBHOOK_SECRET: secret });
     } catch (error) {
       expect(String(error)).toContain("STREAM_WEBHOOK_SECRET");
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+
+  it("does not include a rejected Stream signing key in its error", () => {
+    const secret = " secret-signing-jwk ";
+
+    try {
+      loadConfig({ ...TEST_ENV, STREAM_SIGNING_JWK: secret });
+    } catch (error) {
+      expect(String(error)).toContain("STREAM_SIGNING_JWK");
       expect(String(error)).not.toContain(secret);
     }
   });

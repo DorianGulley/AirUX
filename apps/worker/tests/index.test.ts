@@ -319,6 +319,10 @@ describe("AirUX Worker", () => {
           body: JSON.stringify({ expected_version: 1, outcome: "approved" }),
         },
       ),
+      new Request(
+        `https://airux.app/api/v1/evidence/${CREDENTIAL_ID}/playback-token`,
+        { method: "POST" },
+      ),
     ]) {
       const response = await worker.fetch(request, TEST_ENV);
       expect(response.status).toBe(401);
@@ -342,6 +346,15 @@ describe("AirUX Worker", () => {
     );
     expect(decision.status).toBe(405);
     expect(decision.headers.get("allow")).toBe("POST");
+
+    const playback = worker.fetch(
+      new Request(
+        `https://airux.app/api/v1/evidence/${CREDENTIAL_ID}/playback-token`,
+      ),
+      TEST_ENV,
+    );
+    expect(playback.status).toBe(405);
+    expect(playback.headers.get("allow")).toBe("POST");
   });
 
   it("provides a no-op scheduled handler", () => {

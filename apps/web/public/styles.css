@@ -622,6 +622,14 @@ input:focus-visible {
   text-align: center;
 }
 
+.review-stream-player {
+  display: block;
+  width: 100%;
+  min-height: clamp(18rem, 44vw, 35rem);
+  border: 0;
+  background: #172016;
+}
+
 .review-video-placeholder p {
   margin: 1rem 0 0;
   font-size: 0.9rem;
@@ -926,6 +934,10 @@ input:focus-visible {
   }
 
   .review-video-placeholder {
+    min-height: 15rem;
+  }
+
+  .review-stream-player {
     min-height: 15rem;
   }
 

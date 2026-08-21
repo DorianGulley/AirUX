@@ -10,6 +10,7 @@ import {
 } from "./agent-reviews.js";
 import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
+import { handleReviewPlaybackToken } from "./review-playback.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
 import {
   handleReviewerReviewDecision,
@@ -27,6 +28,8 @@ const AGENT_REVIEW_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)$/;
 const AGENT_REVIEW_CANCEL_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)\/cancel$/;
 const REVIEWER_REVIEW_PATH = /^\/api\/v1\/reviews\/([^/]+)$/;
 const REVIEWER_REVIEW_DECISION_PATH = /^\/api\/v1\/reviews\/([^/]+)\/decision$/;
+const REVIEWER_PLAYBACK_TOKEN_PATH =
+  /^\/api\/v1\/evidence\/([^/]+)\/playback-token$/;
 const STREAM_WEBHOOK_PATH = "/api/v1/webhooks/cloudflare-stream";
 const RATE_LIMIT_RETRY_AFTER_SECONDS = 60;
 
@@ -324,6 +327,37 @@ const worker = {
       return withReviewerRequestRateLimit(request, env, () =>
         withAuthenticatedReviewer(request, config, (reviewer) =>
           handleReviewerReviewDecision(request, reviewId, reviewer, config),
+        ),
+      );
+    }
+
+    const playbackTokenMatch = pathname.match(REVIEWER_PLAYBACK_TOKEN_PATH);
+    if (playbackTokenMatch !== null) {
+      if (request.method !== "POST") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "POST" },
+        );
+      }
+      const evidenceId = playbackTokenMatch[1];
+      if (evidenceId === undefined) {
+        return jsonResponse(
+          { error: { code: "not_found", message: "Not found" } },
+          404,
+        );
+      }
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, (reviewer) =>
+          handleReviewPlaybackToken(evidenceId, reviewer, config, {
+            getStreamVideoDetails: (streamVideoId) =>
+              env.STREAM.video(streamVideoId).details(),
+          }),
         ),
       );
     }

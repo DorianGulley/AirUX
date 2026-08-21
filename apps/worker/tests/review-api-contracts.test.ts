@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import {
   cancelAgentReviewResponseSchema,
+  createPlaybackTokenResponseSchema,
   createReviewResponseSchema,
   decideReviewerReviewResponseSchema,
   getReviewerReviewResponseSchema,
@@ -38,6 +39,7 @@ const CREATED_AT = "2026-08-20T08:00:00.000Z";
 const SUBMITTED_AT = "2026-08-20T08:01:00.000Z";
 const EXPIRES_AT = "2026-08-23T08:01:00.000Z";
 const RESOLVED_AT = "2026-08-20T08:02:00.000Z";
+let streamSigningJwk = "";
 
 const CREATE_BODY = {
   client_request_id: "contract-agent-run",
@@ -181,7 +183,15 @@ async function installContractBackend() {
   });
   const stream = {
     createDirectUpload,
-    video: (id: string) => ({ delete: () => deleteVideo(id) }),
+    video: (id: string) => ({
+      delete: () => deleteVideo(id),
+      details: async () => ({
+        id,
+        readyToStream: true,
+        requireSignedURLs: true,
+        hlsPlaybackUrl: `https://customer-example.cloudflarestream.com/${id}/manifest/video.m3u8`,
+      }),
+    }),
   } as StreamBinding;
 
   const fetcher = vi.fn(
@@ -441,9 +451,14 @@ async function installContractBackend() {
       }
 
       if (url.pathname === "/rest/v1/evidence") {
+        const evidenceId = equalFilter(url, "id");
         const reviewId = equalFilter(url, "review_id");
         return Response.json(
-          evidence.filter((item) => item.review_id === reviewId),
+          evidence.filter(
+            (item) =>
+              (evidenceId === undefined || item.id === evidenceId) &&
+              (reviewId === undefined || item.review_id === reviewId),
+          ),
         );
       }
 
@@ -465,7 +480,11 @@ async function installContractBackend() {
   vi.stubGlobal("fetch", fetcher);
 
   return {
-    env: { ...TEST_ENV, STREAM: stream },
+    env: {
+      ...TEST_ENV,
+      STREAM: stream,
+      STREAM_SIGNING_JWK: streamSigningJwk,
+    },
     reviews,
     decisions,
     deletedStreamIds,
@@ -498,7 +517,22 @@ function reviewerRequest(
   return agentRequest(path, token, method, body);
 }
 
-beforeAll(installTimingSafeEqual);
+beforeAll(async () => {
+  installTimingSafeEqual();
+  const keys = await crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength: 2_048,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256",
+    },
+    true,
+    ["sign", "verify"],
+  );
+  streamSigningJwk = btoa(
+    JSON.stringify(await crypto.subtle.exportKey("jwk", keys.privateKey)),
+  );
+});
 afterAll(removeTimingSafeEqual);
 afterEach(() => vi.unstubAllGlobals());
 
@@ -588,6 +622,22 @@ describe("Review API contracts", () => {
       reviewerRequest(`/api/v1/reviews/${MISSING_REVIEW_ID}`, REVIEWER_A_TOKEN),
       backend.env,
     );
+    const reviewerForeignPlayback = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/evidence/${PENDING_EVIDENCE_B_ID}/playback-token`,
+        REVIEWER_A_TOKEN,
+        "POST",
+      ),
+      backend.env,
+    );
+    const reviewerMissingPlayback = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/evidence/30000000-0000-4000-8000-000000000099/playback-token`,
+        REVIEWER_A_TOKEN,
+        "POST",
+      ),
+      backend.env,
+    );
     const foreignDecision = await worker.fetch(
       reviewerRequest(
         `/api/v1/reviews/${PENDING_REVIEW_B_ID}/decision`,
@@ -609,8 +659,34 @@ describe("Review API contracts", () => {
     expect(reviewerForeign.status).toBe(404);
     expect(reviewerMissing.status).toBe(404);
     expect(await reviewerForeign.text()).toBe(await reviewerMissing.text());
+    expect(reviewerForeignPlayback.status).toBe(404);
+    expect(reviewerMissingPlayback.status).toBe(404);
+    expect(await reviewerForeignPlayback.text()).toBe(
+      await reviewerMissingPlayback.text(),
+    );
     expect(foreignDecision.status).toBe(404);
     expect(backend.decisions).toHaveLength(0);
+  });
+
+  it("issues private playback only to the Review owner", async () => {
+    const backend = await installContractBackend();
+    const response = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/evidence/${PENDING_EVIDENCE_A_ID}/playback-token`,
+        REVIEWER_A_TOKEN,
+        "POST",
+      ),
+      backend.env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = createPlaybackTokenResponseSchema.parse(await response.json());
+    expect(body.playback.expires_at).toMatch(/Z$/);
+    expect(body.playback.player_url).toContain(body.playback.token);
+    expect(JSON.stringify(body)).not.toContain(PENDING_REVIEW_A_ID);
+    expect(JSON.stringify(body)).not.toContain(PENDING_EVIDENCE_A_ID);
+    expect(JSON.stringify(body)).not.toContain(REVIEWER_A_ID);
   });
 
   it("preserves creation and cancellation idempotency through the Worker", async () => {
