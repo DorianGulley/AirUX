@@ -381,6 +381,59 @@ describe("AirUX Worker", () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
+  it("records cleanup when Stream reports that the video is already gone", async () => {
+    const scheduledTime = Date.parse("2026-08-22T04:30:00.000Z");
+    const evidenceId = "347a6473-e510-4d6a-918f-b2bd56d942b7";
+    const reviewId = "8d4ddde8-b58f-4c2c-b37f-b3ea1fb312da";
+    const completed: string[] = [];
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/rpc/prepare_due_evidence_cleanup")) {
+          return Response.json([
+            {
+              evidence_id: evidenceId,
+              review_id: reviewId,
+              stream_video_id: "already-deleted-video",
+              evidence_status: "deleting",
+              review_status: "expired",
+            },
+          ]);
+        }
+        const body = JSON.parse(String(init?.body));
+        completed.push(body.p_evidence_id);
+        return Response.json([
+          {
+            evidence_id: evidenceId,
+            review_id: reviewId,
+            status: "deleted",
+            deleted_at: "2026-08-22T04:29:59.000Z",
+          },
+        ]);
+      },
+    );
+    const notFound = Object.assign(new Error("private provider detail"), {
+      name: "NotFoundError",
+      statusCode: 404,
+    });
+    const deleteVideo = vi.fn(async () => Promise.reject(notFound));
+    const stream = {
+      video: vi.fn(() => ({ delete: deleteVideo })),
+    } as StreamBinding;
+    vi.stubGlobal("fetch", fetcher);
+
+    await worker.scheduled(
+      { scheduledTime, cron: "*/15 * * * *", noRetry: vi.fn() },
+      { ...TEST_ENV, STREAM: stream },
+    );
+
+    expect(stream.video).toHaveBeenCalledExactlyOnceWith(
+      "already-deleted-video",
+    );
+    expect(deleteVideo).toHaveBeenCalledOnce();
+    expect(completed).toEqual([evidenceId]);
+  });
+
   it("fails closed without exposing invalid configuration", async () => {
     const response = worker.fetch(
       new Request("https://airux.app/api/v1/health"),
