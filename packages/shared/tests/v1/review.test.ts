@@ -4,6 +4,9 @@ import {
   API_ERROR_CODES,
   agentReviewSchema,
   CONTRACT_LIMITS,
+  cancelAgentReviewResponseSchema,
+  cancelReviewToolInputSchema,
+  cancelReviewToolOutputSchema,
   createPlaybackTokenResponseSchema,
   createReviewRequestSchema,
   createReviewResponseSchema,
@@ -261,6 +264,76 @@ describe("airux_list_open_reviews tool contracts", () => {
   it("rejects filters so credential scoping remains server-owned", () => {
     expect(
       listOpenReviewsToolInputSchema.safeParse({ status: "pending" }).success,
+    ).toBe(false);
+  });
+});
+
+describe("airux_cancel_review tool contracts", () => {
+  const cancelledReview = {
+    id: "rvw_1",
+    review_url: "https://airux.app/reviews/rvw_1",
+    client_request_id: "agent-run-42",
+    title: validCreateRequest.title,
+    claim: validCreateRequest.claim,
+    criteria: validCreateRequest.criteria,
+    status: "cancelled" as const,
+    version: 2,
+    created_at: "2026-08-20T08:00:00Z",
+    submitted_at: "2026-08-20T08:01:00Z",
+    expires_at: "2026-08-23T08:00:00Z",
+    resolved_at: "2026-08-20T08:02:00Z",
+    evidence: {
+      id: "evd_1",
+      kind: "browser_video" as const,
+      status: "deleting" as const,
+      media_type: "video/webm",
+      size_bytes: 1_024,
+      failure_code: null,
+    },
+    decision: null,
+  };
+
+  it("accepts a Review identifier and returns a cancelled handoff", () => {
+    expect(cancelReviewToolInputSchema.parse({ review_id: "rvw_1" })).toEqual({
+      review_id: "rvw_1",
+    });
+    expect(
+      cancelReviewToolOutputSchema.parse({
+        review_id: "rvw_1",
+        review_url: "https://airux.app/reviews/rvw_1",
+        status: "cancelled",
+      }),
+    ).toEqual({
+      review_id: "rvw_1",
+      review_url: "https://airux.app/reviews/rvw_1",
+      status: "cancelled",
+    });
+  });
+
+  it("requires cancellation responses to schedule Evidence deletion", () => {
+    expect(
+      cancelAgentReviewResponseSchema.safeParse({ review: cancelledReview })
+        .success,
+    ).toBe(true);
+    expect(
+      cancelAgentReviewResponseSchema.safeParse({
+        review: {
+          ...cancelledReview,
+          evidence: { ...cancelledReview.evidence, status: "ready" },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      cancelAgentReviewResponseSchema.safeParse({
+        review: {
+          ...cancelledReview,
+          decision: {
+            outcome: "approved",
+            comment: null,
+            created_at: "2026-08-20T08:02:00Z",
+          },
+        },
+      }).success,
     ).toBe(false);
   });
 });

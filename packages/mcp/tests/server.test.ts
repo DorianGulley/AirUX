@@ -42,10 +42,18 @@ async function connect(
   listOpenReviews: NonNullable<
     Parameters<typeof createAiruxMcpServer>[0]["listOpenReviews"]
   > = vi.fn(async () => ({ reviews: [] })),
+  cancelReview: NonNullable<
+    Parameters<typeof createAiruxMcpServer>[0]["cancelReview"]
+  > = vi.fn(async () => ({
+    review_id: REVIEW_ID,
+    review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+    status: "cancelled" as const,
+  })),
 ) {
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const server = createAiruxMcpServer({
+    cancelReview,
     createReview,
     getReview,
     listOpenReviews,
@@ -73,6 +81,7 @@ describe("AirUX MCP server", () => {
 
     const tools = await client.listTools();
     expect(tools.tools.map(({ name }) => name)).toEqual([
+      "airux_cancel_review",
       "airux_create_review",
       "airux_get_review",
       "airux_list_open_reviews",
@@ -96,6 +105,46 @@ describe("AirUX MCP server", () => {
     ]);
     expect(createReview).toHaveBeenCalledWith(
       toolInput,
+      expect.any(AbortSignal),
+    );
+  });
+
+  it("cancels an open Review and returns the terminal handoff", async () => {
+    const cancelReview = vi.fn(async () => ({
+      review_id: REVIEW_ID,
+      review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+      status: "cancelled" as const,
+    }));
+    const client = await connect(
+      vi.fn(async () => ({
+        review_id: REVIEW_ID,
+        review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+        status: "pending" as const,
+      })),
+      undefined,
+      undefined,
+      cancelReview,
+    );
+
+    const result = await client.callTool({
+      arguments: { review_id: REVIEW_ID },
+      name: "airux_cancel_review",
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toEqual({
+      review_id: REVIEW_ID,
+      review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+      status: "cancelled",
+    });
+    expect(result.content).toEqual([
+      {
+        text: `AirUX review cancelled:\nhttps://airux.example/reviews/${REVIEW_ID}`,
+        type: "text",
+      },
+    ]);
+    expect(cancelReview).toHaveBeenCalledWith(
+      { review_id: REVIEW_ID },
       expect.any(AbortSignal),
     );
   });

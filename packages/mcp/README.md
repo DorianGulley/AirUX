@@ -1,7 +1,7 @@
 # AirUX MCP server
 
-The local stdio server exposes `airux_create_review`, `airux_get_review`, and
-`airux_list_open_reviews`. The create tool records a
+The local stdio server exposes `airux_create_review`, `airux_get_review`,
+`airux_list_open_reviews`, and `airux_cancel_review`. The create tool records a
 validated localhost browser flow, creates an AirUX Review, uploads the temporary
 WebM recording directly to Cloudflare Stream, waits for processing, removes the
 local recording, and returns the pending Review URL.
@@ -52,3 +52,8 @@ created by the configured agent credential, ordered newest first. Match the
 original work using `client_request_id` or the Review title, then pass its `id`
 to `airux_get_review` to resume waiting for the terminal result. An empty list
 means that credential has no unresolved Reviews.
+
+`airux_cancel_review` accepts a `review_id` for a `draft` or `pending` Review.
+Cancellation is idempotent: AirUX makes the Review terminal, revokes reviewer
+playback, and schedules its Evidence for deletion. Repeating cancellation
+returns the same cancelled Review without incrementing its version again.

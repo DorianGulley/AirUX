@@ -1,8 +1,10 @@
 import {
   type ApiErrorCode,
   apiErrorSchema,
+  type CancelAgentReviewResponse,
   type CreateReviewRequest,
   type CreateReviewResponse,
+  cancelAgentReviewResponseSchema,
   createReviewResponseSchema,
   type GetAgentReviewResponse,
   getAgentReviewResponseSchema,
@@ -251,6 +253,27 @@ export class AiruxApiClient {
       throw new AiruxApiError("AirUX returned an invalid Review list", {
         retryable: false,
       });
+    }
+    return parsed.data;
+  }
+
+  async cancelReview(
+    reviewId: string,
+    signal: AbortSignal,
+  ): Promise<CancelAgentReviewResponse> {
+    const { body } = await this.#request(
+      `/api/v1/agent/reviews/${encodeURIComponent(reviewId)}/cancel`,
+      { method: "POST", signal },
+      new Set([200]),
+    );
+    const parsed = cancelAgentReviewResponseSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new AiruxApiError(
+        "AirUX returned an invalid cancellation response",
+        {
+          retryable: false,
+        },
+      );
     }
     return parsed.data;
   }

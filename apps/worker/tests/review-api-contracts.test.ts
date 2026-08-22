@@ -74,7 +74,7 @@ interface StoredEvidence {
   readonly id: string;
   readonly review_id: string;
   readonly kind: "browser_video";
-  readonly status: "awaiting_upload" | "ready";
+  status: "awaiting_upload" | "ready" | "deleting";
   stream_video_id: string | null;
   readonly media_type: "video/webm";
   readonly size_bytes: number;
@@ -82,6 +82,7 @@ interface StoredEvidence {
   readonly width: number | null;
   readonly height: number | null;
   readonly failure_code: null;
+  delete_after: string;
 }
 
 interface StoredDecision {
@@ -144,6 +145,7 @@ function pendingEvidence(id: string, reviewId: string): StoredEvidence {
     width: 1_280,
     height: 720,
     failure_code: null,
+    delete_after: EXPIRES_AT,
   };
 }
 
@@ -287,6 +289,7 @@ async function installContractBackend() {
           width: null,
           height: null,
           failure_code: null,
+          delete_after: body.p_delete_after,
         };
         reviews.push(review);
         evidence.push(item);
@@ -353,6 +356,14 @@ async function installContractBackend() {
         review.status = "cancelled";
         review.version += 1;
         review.resolved_at = RESOLVED_AT;
+        const item = evidence.find(
+          (candidate) => candidate.review_id === review.id,
+        );
+        if (item === undefined) {
+          return new Response(null, { status: 500 });
+        }
+        item.status = "deleting";
+        item.delete_after = RESOLVED_AT;
         return Response.json([
           {
             review_id: review.id,
@@ -486,6 +497,7 @@ async function installContractBackend() {
       STREAM_SIGNING_JWK: streamSigningJwk,
     },
     reviews,
+    evidence,
     decisions,
     deletedStreamIds,
     createDirectUpload,
@@ -746,7 +758,13 @@ describe("Review API contracts", () => {
     expect(firstCancellation.status).toBe(200);
     expect(cancellationRetry.status).toBe(200);
     expect(cancelled.review.status).toBe("cancelled");
+    expect(cancelled.review.evidence.status).toBe("deleting");
     expect(cancelledAgain.review.version).toBe(cancelled.review.version);
+    expect(cancelledAgain.review.evidence.status).toBe("deleting");
+    expect(
+      backend.evidence.find((item) => item.id === CREATED_EVIDENCE_ID)
+        ?.delete_after,
+    ).toBe(RESOLVED_AT);
   });
 
   it("allows exactly one version-checked terminal Decision", async () => {

@@ -1,6 +1,6 @@
 begin;
 
-select plan(26);
+select plan(29);
 
 select has_function(
   'public',
@@ -330,6 +330,27 @@ select is(
 
 select is(
   (
+    select evidence.status
+    from public.evidence
+    inner join public.reviews on reviews.id = evidence.review_id
+    where reviews.client_request_id = 'agent-request-1'
+  ),
+  'deleting',
+  'moves cancelled draft Evidence to deleting'
+);
+
+select ok(
+  (
+    select evidence.delete_after <= clock_timestamp()
+    from public.evidence
+    inner join public.reviews on reviews.id = evidence.review_id
+    where reviews.client_request_id = 'agent-request-1'
+  ),
+  'makes cancelled Evidence immediately due for cleanup'
+);
+
+select is(
+  (
     select status || ':' || version
     from public.cancel_agent_review(
       (select id from public.reviews where client_request_id = 'agent-request-1'),
@@ -366,6 +387,23 @@ values (
   now() + interval '72 hours'
 );
 
+insert into public.evidence (
+  review_id,
+  status,
+  stream_video_id,
+  media_type,
+  size_bytes,
+  delete_after
+)
+values (
+  (select id from public.reviews where client_request_id = 'agent-request-pending'),
+  'ready',
+  'pending-cancellation-video',
+  'video/webm',
+  1024,
+  now() + interval '7 days'
+);
+
 select is(
   (
     select status || ':' || version
@@ -377,6 +415,17 @@ select is(
   ),
   'cancelled:2',
   'cancels an owned pending Review atomically'
+);
+
+select is(
+  (
+    select evidence.status
+    from public.evidence
+    inner join public.reviews on reviews.id = evidence.review_id
+    where reviews.client_request_id = 'agent-request-pending'
+  ),
+  'deleting',
+  'moves cancelled pending Evidence to deleting'
 );
 
 select is(

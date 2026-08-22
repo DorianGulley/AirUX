@@ -94,14 +94,17 @@ function streamClient(overrides: Partial<ReviewStreamClient> = {}) {
   } satisfies ReviewStreamClient;
 }
 
-function detailFetcher(reviewOverrides: Record<string, unknown> = {}) {
+function detailFetcher(
+  reviewOverrides: Record<string, unknown> = {},
+  evidenceOverrides: Record<string, unknown> = {},
+) {
   return vi.fn(async (input: RequestInfo | URL) => {
     const url = new URL(String(input));
     if (url.pathname === "/rest/v1/reviews") {
       return Response.json([reviewRow(reviewOverrides)]);
     }
     if (url.pathname === "/rest/v1/evidence") {
-      return Response.json([evidenceRow()]);
+      return Response.json([evidenceRow(evidenceOverrides)]);
     }
     if (url.pathname === "/rest/v1/decisions") {
       return Response.json([]);
@@ -450,11 +453,14 @@ describe("agent Review reads and cancellation", () => {
   });
 
   it("cancels atomically and returns the resulting detail", async () => {
-    const detail = detailFetcher({
-      status: "cancelled",
-      version: 2,
-      resolved_at: "2026-08-20T08:03:00+00:00",
-    });
+    const detail = detailFetcher(
+      {
+        status: "cancelled",
+        version: 2,
+        resolved_at: "2026-08-20T08:03:00+00:00",
+      },
+      { status: "deleting" },
+    );
     const fetcher = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = new URL(String(input));
@@ -481,7 +487,12 @@ describe("agent Review reads and cancellation", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      review: { id: REVIEW_ID, status: "cancelled", version: 2 },
+      review: {
+        id: REVIEW_ID,
+        status: "cancelled",
+        version: 2,
+        evidence: { status: "deleting" },
+      },
     });
   });
 
