@@ -14,6 +14,7 @@ import {
   readJsonResponse,
 } from "./bounded-json.js";
 import type { AiruxConfig } from "./config.js";
+import { calculateExpiration, EXPIRATION_POLICY } from "./expiration-policy.js";
 import type { AuthenticatedReviewer } from "./reviewer-auth.js";
 
 const DATA_RESPONSE_LIMIT = 1024 * 1024;
@@ -301,6 +302,7 @@ async function writeDecision(
   reviewer: AuthenticatedReviewer,
   config: AiruxConfig,
   fetcher: Fetcher,
+  now: Date,
 ) {
   if (!UUID_PATTERN.test(reviewId)) {
     throw new ReviewerReviewNotFoundError();
@@ -323,6 +325,10 @@ async function writeDecision(
         p_expected_version: parsedRequest.data.expected_version,
         p_outcome: parsedRequest.data.outcome,
         p_comment: parsedRequest.data.comment ?? null,
+        p_evidence_delete_after: calculateExpiration(
+          now,
+          EXPIRATION_POLICY.resolvedEvidenceMs,
+        ),
       }),
     },
     fetcher,
@@ -397,8 +403,10 @@ export async function handleReviewerReviewDecision(
   reviewer: AuthenticatedReviewer,
   config: AiruxConfig,
   fetcher: Fetcher = fetch,
+  now: () => Date = () => new Date(),
 ) {
   try {
+    const currentTime = now();
     return jsonResponse(
       decideReviewerReviewResponseSchema.parse({
         review: await writeDecision(
@@ -407,6 +415,7 @@ export async function handleReviewerReviewDecision(
           reviewer,
           config,
           fetcher,
+          currentTime,
         ),
       }),
     );

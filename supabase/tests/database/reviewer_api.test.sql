@@ -1,28 +1,35 @@
 begin;
 
-select plan(19);
+select plan(21);
 
 select has_function(
   'public',
   'decide_reviewer_review',
-  array['uuid', 'uuid', 'integer', 'text', 'text'],
+  array[
+    'uuid',
+    'uuid',
+    'integer',
+    'text',
+    'text',
+    'timestamp with time zone'
+  ],
   'creates the transactional reviewer decision function'
 );
 
 select ok(
   has_function_privilege(
     'service_role',
-    'public.decide_reviewer_review(uuid,uuid,integer,text,text)',
+    'public.decide_reviewer_review(uuid,uuid,integer,text,text,timestamp with time zone)',
     'execute'
   )
     and not has_function_privilege(
       'anon',
-      'public.decide_reviewer_review(uuid,uuid,integer,text,text)',
+      'public.decide_reviewer_review(uuid,uuid,integer,text,text,timestamp with time zone)',
       'execute'
     )
     and not has_function_privilege(
       'authenticated',
-      'public.decide_reviewer_review(uuid,uuid,integer,text,text)',
+      'public.decide_reviewer_review(uuid,uuid,integer,text,text,timestamp with time zone)',
       'execute'
     ),
   'only the service role may submit reviewer decisions'
@@ -188,7 +195,8 @@ select is(
       '00000000-0000-4000-8000-000000000030',
       3,
       'approved',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   ),
   'approved:4:approved:none:Approval Review:ready:1280',
@@ -228,6 +236,34 @@ select isnt(
   'records the resolution timestamp in the same transaction'
 );
 
+select ok(
+  (
+    select delete_after between
+      clock_timestamp() + interval '6 days 23 hours'
+      and clock_timestamp() + interval '7 days 1 hour'
+    from public.evidence
+    where id = '30000000-0000-4000-8000-000000000030'
+  ),
+  'persists resolved Evidence retention in the decision transaction'
+);
+
+select throws_ok(
+  $$
+    select *
+    from public.decide_reviewer_review(
+      '20000000-0000-4000-8000-000000000032',
+      '00000000-0000-4000-8000-000000000030',
+      3,
+      'approved',
+      null,
+      '2000-01-01 00:00:00+00'
+    )
+  $$,
+  'P0001',
+  'invalid evidence expiration',
+  'rejects a resolved Evidence expiry that is not in the future'
+);
+
 select is(
   (
     select count(*)::integer
@@ -236,7 +272,8 @@ select is(
       '00000000-0000-4000-8000-000000000030',
       1,
       'approved',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   ),
   0,
@@ -251,7 +288,8 @@ select is(
       '00000000-0000-4000-8000-000000000030',
       1,
       'approved',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   ),
   0,
@@ -266,7 +304,8 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000030',
       2,
       'approved',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   $$,
   'P0001',
@@ -282,7 +321,8 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000030',
       3,
       'deferred',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   $$,
   'P0001',
@@ -298,7 +338,8 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000030',
       3,
       'changes_requested',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   $$,
   'P0001',
@@ -314,7 +355,8 @@ select is(
       '00000000-0000-4000-8000-000000000030',
       3,
       'changes_requested',
-      'Show the expanded menu.'
+      'Show the expanded menu.',
+      clock_timestamp() + interval '7 days'
     )
   ),
   'changes_requested:4:changes_requested:Show the expanded menu.',
@@ -339,7 +381,8 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000030',
       3,
       'approved',
-      null
+      null,
+      clock_timestamp() + interval '7 days'
     )
   $$,
   'P0001',
@@ -355,7 +398,8 @@ select throws_ok(
       '00000000-0000-4000-8000-000000000030',
       4,
       'changes_requested',
-      'Use a different outcome.'
+      'Use a different outcome.',
+      clock_timestamp() + interval '7 days'
     )
   $$,
   'P0001',
@@ -391,7 +435,8 @@ select is(
       '00000000-0000-4000-8000-000000000031',
       1,
       'approved',
-      'Reviewed by the owner.'
+      'Reviewed by the owner.',
+      clock_timestamp() + interval '7 days'
     )
   ),
   'approved:2',

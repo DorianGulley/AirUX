@@ -18,12 +18,11 @@ import {
   readJsonResponse,
 } from "./bounded-json.js";
 import type { AiruxConfig } from "./config.js";
+import { calculateExpiration, EXPIRATION_POLICY } from "./expiration-policy.js";
 
 const DATA_RESPONSE_LIMIT = 1024 * 1024;
 const DATA_ERROR_RESPONSE_LIMIT = 16 * 1024;
 const REQUEST_BODY_LIMIT = 32 * 1024;
-const DRAFT_LIFETIME_MS = 60 * 60 * 1000;
-const UPLOAD_URL_LIFETIME_MS = 15 * 60 * 1000;
 const RESULT_POLL_RETRY_AFTER_SECONDS = 2;
 const MAX_VIDEO_DURATION_SECONDS = CONTRACT_LIMITS.captureDurationMs / 1000;
 const RPC_ERROR_CODE = "P0001";
@@ -248,7 +247,7 @@ async function createReviewRecord(
   fetcher: Fetcher,
   now: Date,
 ) {
-  const expiresAt = new Date(now.getTime() + DRAFT_LIFETIME_MS).toISOString();
+  const expiresAt = calculateExpiration(now, EXPIRATION_POLICY.draftReviewMs);
   const response = await fetchData(
     dataApiUrl(config, "rpc/create_agent_review"),
     {
@@ -360,9 +359,10 @@ async function createReview(
     fetcher,
     now,
   );
-  const uploadExpiresAt = new Date(
-    now.getTime() + UPLOAD_URL_LIFETIME_MS,
-  ).toISOString();
+  const uploadExpiresAt = calculateExpiration(
+    now,
+    EXPIRATION_POLICY.uploadUrlMs,
+  );
 
   let directUpload: Awaited<
     ReturnType<ReviewStreamClient["createDirectUpload"]>

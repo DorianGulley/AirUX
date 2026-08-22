@@ -1,6 +1,6 @@
 import type { AiruxConfig } from "./config.js";
+import { EXPIRATION_POLICY } from "./expiration-policy.js";
 
-const PLAYBACK_TOKEN_LIFETIME_SECONDS = 15 * 60;
 const STREAM_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 export class StreamPlaybackTokenError extends Error {}
@@ -67,7 +67,7 @@ export async function createStreamPlaybackToken(
       ["sign"],
     );
     const issuedAt = Math.floor(now.getTime() / 1_000);
-    const expiresAt = issuedAt + PLAYBACK_TOKEN_LIFETIME_SECONDS;
+    const expiresAt = issuedAt + EXPIRATION_POLICY.playbackTokenSeconds;
     const header = encodeBase64Url(
       JSON.stringify({ alg: "RS256", kid: config.stream.signingKeyId }),
     );
