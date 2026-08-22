@@ -110,6 +110,10 @@ operations are scoped to both the authenticated owner and credential, and
 agent-facing responses omit owner IDs, credential IDs, Stream IDs, and deletion
 metadata. Open Review detail responses include `Retry-After` guidance for the
 local MCP client's increasing-interval result poll; terminal responses omit it.
+Cancellation atomically moves a draft or pending Review to `cancelled`, moves
+its Evidence to `deleting`, and makes that Evidence immediately due for the
+scheduled cleanup handler. Repeated cancellation is an idempotent no-op, and
+late Stream processing callbacks cannot reopen the Review or Evidence.
 
 Stream sends processing results to:
 

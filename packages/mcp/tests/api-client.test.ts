@@ -155,6 +155,50 @@ describe("AiruxApiClient", () => {
     ).rejects.toMatchObject({ retryable: false });
   });
 
+  it("cancels a Review through the exact mutation route", async () => {
+    const response = {
+      review: {
+        id: REVIEW_ID,
+        review_url: assignment.review_url,
+        client_request_id: createRequest.client_request_id,
+        title: createRequest.title,
+        claim: createRequest.claim,
+        criteria: createRequest.criteria,
+        status: "cancelled",
+        version: 2,
+        created_at: "2026-08-20T22:00:00.000Z",
+        submitted_at: "2026-08-20T22:00:10.000Z",
+        expires_at: "2026-08-23T22:00:00.000Z",
+        resolved_at: "2026-08-20T22:10:00.000Z",
+        evidence: {
+          id: EVIDENCE_ID,
+          kind: "browser_video",
+          status: "deleting",
+          media_type: "video/webm",
+          size_bytes: 5,
+          failure_code: null,
+        },
+        decision: null,
+      },
+    };
+    const fetcher = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        responseJson(response),
+    );
+    const client = new AiruxApiClient(
+      { agentToken: TOKEN, apiOrigin: "https://airux.example" },
+      fetcher,
+    );
+
+    await expect(
+      client.cancelReview(REVIEW_ID, new AbortController().signal),
+    ).resolves.toEqual(response);
+    expect(String(fetcher.mock.calls[0]?.[0])).toBe(
+      `https://airux.example/api/v1/agent/reviews/${REVIEW_ID}/cancel`,
+    );
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+  });
+
   it("surfaces retry metadata without exposing API details", async () => {
     const fetcher = vi.fn(
       async (_input: string | URL | Request, _init?: RequestInit) =>

@@ -1,6 +1,10 @@
 import {
+  type CancelReviewToolInput,
+  type CancelReviewToolOutput,
   type CreateReviewToolInput,
   type CreateReviewToolOutput,
+  cancelReviewToolInputSchema,
+  cancelReviewToolOutputSchema,
   createReviewToolInputSchema,
   createReviewToolOutputSchema,
   type GetReviewToolInput,
@@ -15,6 +19,7 @@ import {
 import { McpServer } from "@modelcontextprotocol/server";
 
 import { AiruxApiClient } from "./api-client.js";
+import { cancelAiruxReview } from "./cancel-review.js";
 import type { AiruxRuntimeConfig } from "./config.js";
 import { createAiruxReview } from "./create-review.js";
 import { getAiruxReview } from "./get-review.js";
@@ -22,6 +27,10 @@ import { listAiruxOpenReviews } from "./list-open-reviews.js";
 
 export interface AiruxMcpServerOptions {
   readonly config?: AiruxRuntimeConfig;
+  readonly cancelReview?: (
+    input: CancelReviewToolInput,
+    signal: AbortSignal,
+  ) => Promise<CancelReviewToolOutput>;
   readonly createReview?: (
     input: CreateReviewToolInput,
     signal: AbortSignal,
@@ -57,6 +66,16 @@ function openReviewsText(output: ListOpenReviewsToolOutput) {
 
 export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
   const config = options.config;
+  const cancelReview =
+    options.cancelReview ??
+    (config === undefined
+      ? undefined
+      : (input: CancelReviewToolInput, signal: AbortSignal) =>
+          cancelAiruxReview(
+            input,
+            { api: new AiruxApiClient(config) },
+            signal,
+          ));
   const createReview =
     options.createReview ??
     (config === undefined
@@ -84,6 +103,7 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
             signal,
           ));
   if (
+    cancelReview === undefined ||
     createReview === undefined ||
     getReview === undefined ||
     listOpenReviews === undefined
@@ -92,6 +112,45 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
   }
 
   const server = new McpServer({ name: "airux", version: "0.1.0" });
+  server.registerTool(
+    "airux_cancel_review",
+    {
+      annotations: {
+        destructiveHint: true,
+        openWorldHint: true,
+        readOnlyHint: false,
+      },
+      description:
+        "Cancel a draft or pending AirUX Review and schedule its Evidence for deletion.",
+      inputSchema: cancelReviewToolInputSchema,
+      outputSchema: cancelReviewToolOutputSchema,
+      title: "Cancel AirUX Review",
+    },
+    async (input, context) => {
+      try {
+        const output = await cancelReview(input, context.mcpReq.signal);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `AirUX review cancelled:\n${output.review_url}`,
+            },
+          ],
+          structuredContent: output,
+        };
+      } catch {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "AirUX could not cancel the Review.",
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
   server.registerTool(
     "airux_create_review",
     {

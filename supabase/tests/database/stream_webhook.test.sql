@@ -272,11 +272,10 @@ select throws_ok(
 select is(
   (
     select status
-    from public.transition_review_state(
+    from public.cancel_agent_review(
       '20000000-0000-4000-8000-000000000043',
-      'draft',
-      'cancelled',
-      0
+      '00000000-0000-4000-8000-000000000044',
+      '10000000-0000-4000-8000-000000000044'
     )
   ),
   'cancelled',
@@ -295,8 +294,8 @@ select is(
       720
     )
   ),
-  'ready:cancelled',
-  'records late ready Evidence without reopening a cancelled Review'
+  'deleting:cancelled',
+  'ignores late ready Evidence after cancellation schedules deletion'
 );
 
 select is(

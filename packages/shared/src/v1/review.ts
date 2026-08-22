@@ -112,6 +112,7 @@ export const createReviewToolOutputSchema = z
 export const getReviewToolInputSchema = z
   .object({ review_id: identifierSchema })
   .strict();
+export const cancelReviewToolInputSchema = getReviewToolInputSchema;
 
 export const agentReviewEvidenceSchema = z
   .object({
@@ -175,6 +176,14 @@ export const getReviewToolOutputSchema = z
     }
   });
 
+export const cancelReviewToolOutputSchema = z
+  .object({
+    review_id: identifierSchema,
+    review_url: z.url(),
+    status: z.literal("cancelled"),
+  })
+  .strict();
+
 export const agentReviewSummarySchema = z
   .object({
     id: identifierSchema,
@@ -227,7 +236,33 @@ export const listOpenReviewsToolInputSchema = z.object({}).strict();
 export const listOpenReviewsToolOutputSchema =
   listOpenAgentReviewsResponseSchema;
 
-export const cancelAgentReviewResponseSchema = getAgentReviewResponseSchema;
+export const cancelAgentReviewResponseSchema =
+  getAgentReviewResponseSchema.superRefine((response, context) => {
+    if (response.review.status !== "cancelled") {
+      context.addIssue({
+        code: "custom",
+        message: "A cancellation response requires a cancelled Review",
+        path: ["review", "status"],
+      });
+    }
+    if (
+      response.review.evidence.status !== "deleting" &&
+      response.review.evidence.status !== "deleted"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Cancelled Review Evidence must be deleting or deleted",
+        path: ["review", "evidence", "status"],
+      });
+    }
+    if (response.review.decision !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "A cancelled Review cannot include a Decision",
+        path: ["review", "decision"],
+      });
+    }
+  });
 
 export const reviewerReviewEvidenceSchema = z
   .object({
@@ -421,6 +456,10 @@ export type CreateReviewToolOutput = z.infer<
 >;
 export type GetReviewToolInput = z.infer<typeof getReviewToolInputSchema>;
 export type GetReviewToolOutput = z.infer<typeof getReviewToolOutputSchema>;
+export type CancelReviewToolInput = z.infer<typeof cancelReviewToolInputSchema>;
+export type CancelReviewToolOutput = z.infer<
+  typeof cancelReviewToolOutputSchema
+>;
 export type AgentReviewEvidence = z.infer<typeof agentReviewEvidenceSchema>;
 export type AgentReviewDecision = z.infer<typeof agentReviewDecisionSchema>;
 export type AgentReviewSummary = z.infer<typeof agentReviewSummarySchema>;

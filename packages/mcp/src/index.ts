@@ -1,5 +1,6 @@
 export * from "./api-client.js";
 export * from "./browser-recording.js";
+export * from "./cancel-review.js";
 export * from "./capture-plan-runner.js";
 export * from "./config.js";
 export * from "./create-review.js";
