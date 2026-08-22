@@ -17,6 +17,8 @@ import {
   getReviewerReviewResponseSchema,
   getReviewToolInputSchema,
   getReviewToolOutputSchema,
+  listOpenReviewsToolInputSchema,
+  listOpenReviewsToolOutputSchema,
   REVIEW_STATES,
   reviewSchema,
   reviewStateSchema,
@@ -223,6 +225,43 @@ describe("airux_get_review tool contracts", () => {
         }).success,
       ).toBe(true);
     }
+  });
+});
+
+describe("airux_list_open_reviews tool contracts", () => {
+  const summary = {
+    id: "rvw_1",
+    review_url: "https://airux.app/reviews/rvw_1",
+    client_request_id: "agent-run-42",
+    title: validCreateRequest.title,
+    status: "pending" as const,
+    version: 1,
+    created_at: "2026-08-20T08:00:00Z",
+    expires_at: "2026-08-23T08:00:00Z",
+  };
+
+  it("takes no arguments and returns compact open Review summaries", () => {
+    expect(listOpenReviewsToolInputSchema.parse({})).toEqual({});
+    expect(
+      listOpenReviewsToolOutputSchema.parse({ reviews: [summary] }),
+    ).toEqual({ reviews: [summary] });
+  });
+
+  it("accepts an empty result and rejects terminal Review summaries", () => {
+    expect(listOpenReviewsToolOutputSchema.parse({ reviews: [] })).toEqual({
+      reviews: [],
+    });
+    expect(
+      listOpenReviewsToolOutputSchema.safeParse({
+        reviews: [{ ...summary, status: "approved" }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects filters so credential scoping remains server-owned", () => {
+    expect(
+      listOpenReviewsToolInputSchema.safeParse({ status: "pending" }).success,
+    ).toBe(false);
   });
 });
 

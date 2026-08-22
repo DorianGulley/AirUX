@@ -630,7 +630,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
 | M6-1 | Result polling | Implement `airux_get_review` with increasing intervals and retry guidance. | Completed | M3-2, M4-6 |
-| M6-2 | Agent resumption | Implement `airux_list_open_reviews` and recovery after interruption. | Not Started | M3-2, M6-1 |
+| M6-2 | Agent resumption | Implement `airux_list_open_reviews` and recovery after interruption. | Completed | M3-2, M6-1 |
 | M6-3 | Cancellation | Complete cancellation behavior across MCP, API, Review state, and Evidence. | Not Started | M3-2, M4-4 |
 | M6-4 | Expiration policy | Calculate and persist upload, draft, pending, playback, and evidence expiry times. | Not Started | M3-1 |
 | M6-5 | Scheduled cleanup | Query due Evidence, delete Stream videos, and record deletion results. | Not Started | M1-4, M4-3, M6-4 |

@@ -39,10 +39,17 @@ async function connect(
       created_at: "2026-08-20T22:10:00.000Z",
     },
   })),
+  listOpenReviews: NonNullable<
+    Parameters<typeof createAiruxMcpServer>[0]["listOpenReviews"]
+  > = vi.fn(async () => ({ reviews: [] })),
 ) {
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
-  const server = createAiruxMcpServer({ createReview, getReview });
+  const server = createAiruxMcpServer({
+    createReview,
+    getReview,
+    listOpenReviews,
+  });
   const client = new Client({ name: "airux-test", version: "0.1.0" });
   await Promise.all([
     server.connect(serverTransport),
@@ -68,6 +75,7 @@ describe("AirUX MCP server", () => {
     expect(tools.tools.map(({ name }) => name)).toEqual([
       "airux_create_review",
       "airux_get_review",
+      "airux_list_open_reviews",
     ]);
     const result = await client.callTool({
       arguments: toolInput,
@@ -90,6 +98,71 @@ describe("AirUX MCP server", () => {
       toolInput,
       expect.any(AbortSignal),
     );
+  });
+
+  it("lists resumable Reviews and explains how to continue waiting", async () => {
+    const listOpenReviews = vi.fn(async () => ({
+      reviews: [
+        {
+          id: REVIEW_ID,
+          review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+          client_request_id: "agent-run-45",
+          title: "Review the flow",
+          status: "pending" as const,
+          version: 1,
+          created_at: "2026-08-20T22:00:00.000Z",
+          expires_at: "2026-08-23T22:00:00.000Z",
+        },
+      ],
+    }));
+    const client = await connect(
+      vi.fn(async () => ({
+        review_id: REVIEW_ID,
+        review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+        status: "pending" as const,
+      })),
+      undefined,
+      listOpenReviews,
+    );
+
+    const result = await client.callTool({
+      arguments: {},
+      name: "airux_list_open_reviews",
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      reviews: [
+        {
+          id: REVIEW_ID,
+          client_request_id: "agent-run-45",
+          status: "pending",
+        },
+      ],
+    });
+    expect(JSON.stringify(result.content)).toContain(REVIEW_ID);
+    expect(JSON.stringify(result.content)).toContain("airux_get_review");
+    expect(listOpenReviews).toHaveBeenCalledWith({}, expect.any(AbortSignal));
+  });
+
+  it("returns a clear empty recovery result", async () => {
+    const client = await connect(
+      vi.fn(async () => ({
+        review_id: REVIEW_ID,
+        review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+        status: "pending" as const,
+      })),
+    );
+
+    const result = await client.callTool({
+      arguments: {},
+      name: "airux_list_open_reviews",
+    });
+
+    expect(result.content).toEqual([
+      { type: "text", text: "No open AirUX reviews were found." },
+    ]);
+    expect(result.structuredContent).toEqual({ reviews: [] });
   });
 
   it("waits for and returns the final AirUX review result", async () => {
