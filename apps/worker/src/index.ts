@@ -17,6 +17,7 @@ import {
   handleReviewerReviewGet,
 } from "./reviewer-reviews.js";
 import { runScheduledCleanup } from "./scheduled-cleanup.js";
+import { deleteStreamVideo } from "./stream-video-deletion.js";
 import { handleStreamWebhook } from "./stream-webhook.js";
 
 const HEALTH_PATH = "/api/v1/health";
@@ -415,7 +416,7 @@ const worker = {
       config,
       {
         stream: {
-          deleteVideo: (id) => env.STREAM.video(id).delete(),
+          deleteVideo: (id) => deleteStreamVideo(env.STREAM.video(id)),
         },
       },
       new Date(controller.scheduledTime),

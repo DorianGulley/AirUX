@@ -1,6 +1,6 @@
 begin;
 
-select plan(20);
+select plan(23);
 
 select has_function(
   'public',
@@ -340,6 +340,35 @@ select isnt(
   ),
   null,
   'records the Evidence deletion timestamp'
+);
+
+create temporary table repeated_completion as
+select *
+from public.complete_evidence_cleanup(
+  '30000000-0000-4000-8000-000000000052',
+  'cleanup-pending-video'
+);
+
+select is(
+  (select status from repeated_completion),
+  'deleted',
+  'repeats cleanup completion as an idempotent success'
+);
+
+select is(
+  (select count(*)::integer from repeated_completion),
+  1,
+  'returns one result when overlapping cleanup already completed the row'
+);
+
+select is(
+  (select deleted_at from repeated_completion),
+  (
+    select deleted_at
+    from public.evidence
+    where id = '30000000-0000-4000-8000-000000000052'
+  ),
+  'preserves the original deletion timestamp on repeated completion'
 );
 
 select is(

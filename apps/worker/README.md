@@ -129,9 +129,12 @@ invocation prepares at most 25 due Evidence rows in Postgres, expiring draft or
 pending Reviews and revoking playback before calling Stream through its Worker
 binding. Successful deletion moves Evidence from `deleting` to `deleted` and
 records `deleted_at`; expired drafts without an attached Stream video are
-completed locally. A failed provider or completion operation remains
-`deleting` and due for a later invocation. M6-6 will harden that retry path for
-already-missing provider videos and overlapping invocations.
+completed locally. Stream's typed `NotFoundError` is treated as successful
+deletion so a retry can reconcile a video deleted before its database
+completion was recorded. Database completion is also idempotent: overlapping
+Cron invocations return the original deletion result without changing
+`deleted_at`. Other provider and database failures still fail the Cron
+invocation and remain eligible for a later scheduled retry.
 
 Stream sends processing results to:
 
