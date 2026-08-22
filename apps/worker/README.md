@@ -124,6 +124,15 @@ exception: it makes Evidence immediately due. Playback credentials use the
 same policy module and expire after 15 minutes. M6-5 owns acting on persisted
 `delete_after` timestamps; M6-4 only calculates and records them.
 
+The development Worker runs scheduled cleanup every 15 minutes. Each Cron
+invocation prepares at most 25 due Evidence rows in Postgres, expiring draft or
+pending Reviews and revoking playback before calling Stream through its Worker
+binding. Successful deletion moves Evidence from `deleting` to `deleted` and
+records `deleted_at`; expired drafts without an attached Stream video are
+completed locally. A failed provider or completion operation remains
+`deleting` and due for a later invocation. M6-6 will harden that retry path for
+already-missing provider videos and overlapping invocations.
+
 Stream sends processing results to:
 
 ```text
@@ -181,3 +190,6 @@ pnpm --filter @airux/worker exec wrangler secret put STREAM_WEBHOOK_SECRET --env
 
 Deployments use `pnpm worker:deploy`, which always selects the named
 `development` environment. Production configuration is deferred to M7-3.
+The development Cron Trigger is managed exclusively by `wrangler.jsonc`; local
+scheduled-handler testing remains opt-in through Wrangler's
+`/cdn-cgi/handler/scheduled` route.

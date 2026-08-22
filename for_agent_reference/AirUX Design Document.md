@@ -633,7 +633,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M6-2 | Agent resumption | Implement `airux_list_open_reviews` and recovery after interruption. | Completed | M3-2, M6-1 |
 | M6-3 | Cancellation | Complete cancellation behavior across MCP, API, Review state, and Evidence. | Completed | M3-2, M4-4 |
 | M6-4 | Expiration policy | Calculate and persist upload, draft, pending, playback, and evidence expiry times. | Completed | M3-1 |
-| M6-5 | Scheduled cleanup | Query due Evidence, delete Stream videos, and record deletion results. | Not Started | M1-4, M4-3, M6-4 |
+| M6-5 | Scheduled cleanup | Query due Evidence, delete Stream videos, and record deletion results. | Completed | M1-4, M4-3, M6-4 |
 | M6-6 | Cleanup reliability | Make deletion idempotent and retry failures during later Cron invocations. | Not Started | M6-5 |
 
 ### M7: Harden and release the MVP

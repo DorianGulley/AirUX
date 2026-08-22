@@ -46,6 +46,9 @@
   "env": {
     "development": {
       "name": "airux-dev",
+      "triggers": {
+        "crons": ["*/15 * * * *"]
+      },
       "vars": {
         "AIRUX_ENVIRONMENT": "development",
         "AIRUX_APP_ORIGIN": "https://airux-dev.airux-platform.workers.dev",
