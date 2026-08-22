@@ -412,10 +412,9 @@ describe("AirUX Worker", () => {
         ]);
       },
     );
-    const notFound = Object.assign(new Error("private provider detail"), {
-      name: "NotFoundError",
-      statusCode: 404,
-    });
+    const notFound = new Error(
+      "Not Found: The requested resource or operation was not found.",
+    );
     const deleteVideo = vi.fn(async () => Promise.reject(notFound));
     const stream = {
       video: vi.fn(() => ({ delete: deleteVideo })),

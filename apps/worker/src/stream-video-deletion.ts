@@ -2,12 +2,19 @@ interface StreamVideoDeletionHandle {
   delete(): Promise<void>;
 }
 
+const STREAM_NOT_FOUND_MESSAGE =
+  "Not Found: The requested resource or operation was not found.";
+
 function isNotFoundError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
   return (
-    error instanceof Error &&
-    error.name === "NotFoundError" &&
-    "statusCode" in error &&
-    error.statusCode === 404
+    (error.name === "NotFoundError" &&
+      "statusCode" in error &&
+      error.statusCode === 404) ||
+    (error.name === "Error" && error.message === STREAM_NOT_FOUND_MESSAGE)
   );
 }
 
