@@ -16,6 +16,7 @@ import {
   handleReviewerReviewDecision,
   handleReviewerReviewGet,
 } from "./reviewer-reviews.js";
+import { runScheduledCleanup } from "./scheduled-cleanup.js";
 import { handleStreamWebhook } from "./stream-webhook.js";
 
 const HEALTH_PATH = "/api/v1/health";
@@ -401,8 +402,24 @@ const worker = {
     );
   },
 
-  scheduled() {
-    // Cleanup work is introduced in M6-5.
+  async scheduled(controller: ScheduledController, env: Env) {
+    let config: AiruxConfig;
+
+    try {
+      config = loadConfig(env);
+    } catch {
+      throw new Error("Scheduled cleanup configuration unavailable");
+    }
+
+    await runScheduledCleanup(
+      config,
+      {
+        stream: {
+          deleteVideo: (id) => env.STREAM.video(id).delete(),
+        },
+      },
+      new Date(controller.scheduledTime),
+    );
   },
 } satisfies ExportedHandler<Env>;
 

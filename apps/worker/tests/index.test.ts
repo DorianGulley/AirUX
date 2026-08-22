@@ -357,8 +357,28 @@ describe("AirUX Worker", () => {
     expect(playback.headers.get("allow")).toBe("POST");
   });
 
-  it("provides a no-op scheduled handler", () => {
-    expect(worker.scheduled()).toBeUndefined();
+  it("runs scheduled cleanup at the Cron event timestamp", async () => {
+    const scheduledTime = Date.parse("2026-08-22T04:30:00.000Z");
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://example.supabase.co/rest/v1/rpc/prepare_due_evidence_cleanup",
+        );
+        expect(JSON.parse(String(init?.body))).toEqual({
+          p_due_before: "2026-08-22T04:30:00.000Z",
+          p_limit: 25,
+        });
+        return Response.json([]);
+      },
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    await worker.scheduled(
+      { scheduledTime, cron: "*/15 * * * *", noRetry: vi.fn() },
+      TEST_ENV,
+    );
+
+    expect(fetcher).toHaveBeenCalledOnce();
   });
 
   it("fails closed without exposing invalid configuration", async () => {
