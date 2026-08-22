@@ -7,6 +7,7 @@ import {
 import { jsonResponse } from "./api-response.js";
 import { readJsonResponse } from "./bounded-json.js";
 import type { AiruxConfig } from "./config.js";
+import { calculateExpiration, EXPIRATION_POLICY } from "./expiration-policy.js";
 
 const REQUEST_BODY_LIMIT = 64 * 1024;
 const DATA_RESPONSE_LIMIT = 16 * 1024;
@@ -282,6 +283,7 @@ async function processEvent(
   event: StreamWebhookEvent,
   config: AiruxConfig,
   fetcher: Fetcher,
+  pendingExpiresAt: string | null,
 ) {
   let response: Response;
   try {
@@ -301,6 +303,7 @@ async function processEvent(
           p_duration_ms: event.durationMs,
           p_width: event.width,
           p_height: event.height,
+          p_pending_expires_at: pendingExpiresAt,
         }),
         redirect: "manual",
       },
@@ -391,7 +394,16 @@ export async function handleStreamWebhook(
       now,
     );
     const event = parseEvent(body);
-    await processEvent(event, config, dependencies.fetcher ?? fetch);
+    const pendingExpiresAt =
+      event.targetStatus === "ready"
+        ? calculateExpiration(now, EXPIRATION_POLICY.pendingReviewMs)
+        : null;
+    await processEvent(
+      event,
+      config,
+      dependencies.fetcher ?? fetch,
+      pendingExpiresAt,
+    );
     return noContentResponse();
   } catch (error) {
     return errorResponse(error);

@@ -115,6 +115,15 @@ its Evidence to `deleting`, and makes that Evidence immediately due for the
 scheduled cleanup handler. Repeated cancellation is an idempotent no-op, and
 late Stream processing callbacks cannot reopen the Review or Evidence.
 
+Review retention uses the fixed MVP windows centralized in
+`src/expiration-policy.ts`. A new draft Review and its Evidence expire after
+one hour. A ready Stream webhook atomically moves both expirations to 72 hours
+from processing completion, and a terminal reviewer Decision atomically keeps
+the Evidence for seven days from resolution. Cancellation remains the explicit
+exception: it makes Evidence immediately due. Playback credentials use the
+same policy module and expire after 15 minutes. M6-5 owns acting on persisted
+`delete_after` timestamps; M6-4 only calculates and records them.
+
 Stream sends processing results to:
 
 ```text
@@ -124,9 +133,10 @@ POST /api/v1/webhooks/cloudflare-stream
 The handler verifies `Webhook-Signature` against the exact request bytes with
 HMAC-SHA256 and accepts timestamps within five minutes of Worker time. Signed
 ready notifications atomically record duration and dimensions, transition the
-Evidence to `ready`, and move a draft Review to `pending`. Error notifications
-transition only the Evidence to `failed`. Duplicate and unrelated signed
-notifications are acknowledged without reopening terminal state.
+Evidence to `ready`, move a draft Review to `pending`, and persist the 72-hour
+pending and Evidence expirations. Error notifications transition only the
+Evidence to `failed`. Duplicate and unrelated signed notifications are
+acknowledged without reopening terminal state or extending retention.
 
 Cloudflare permits one Stream webhook subscription per account. Register the
 environment's public endpoint through the Stream API, then store the returned

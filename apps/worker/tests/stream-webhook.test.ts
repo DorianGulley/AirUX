@@ -88,6 +88,7 @@ describe("Stream webhook", () => {
           p_duration_ms: 15_500,
           p_width: 1_280,
           p_height: 720,
+          p_pending_expires_at: "2026-08-23T21:45:00.000Z",
         });
         return Response.json([processedRow()]);
       },
@@ -132,6 +133,7 @@ describe("Stream webhook", () => {
           p_duration_ms: null,
           p_width: null,
           p_height: null,
+          p_pending_expires_at: null,
         });
         expect(String(init?.body)).not.toContain("private provider detail");
         return Response.json([

@@ -13,6 +13,7 @@ const OTHER_REVIEWER_ID = "eb2d9347-652c-43ba-8e8c-81ac9a17d909";
 const REVIEW_ID = "8d4ddde8-b58f-4c2c-b37f-b3ea1fb312da";
 const EVIDENCE_ID = "347a6473-e510-4d6a-918f-b2bd56d942b7";
 const DECISION_ID = "4e295f6a-9367-4871-8cbd-1337306d0136";
+const NOW = new Date("2026-08-20T08:02:00.000Z");
 
 function reviewRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -262,6 +263,7 @@ describe("reviewer decisions", () => {
             p_expected_version: 1,
             p_outcome: "approved",
             p_comment: null,
+            p_evidence_delete_after: "2026-08-27T08:02:00.000Z",
           });
           return Response.json([decisionTransactionRow()]);
         }
@@ -275,6 +277,7 @@ describe("reviewer decisions", () => {
       REVIEWER,
       CONFIG,
       fetcher,
+      () => NOW,
     );
 
     expect(response.status).toBe(200);

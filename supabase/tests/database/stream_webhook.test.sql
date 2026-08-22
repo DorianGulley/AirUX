@@ -1,28 +1,36 @@
 begin;
 
-select plan(17);
+select plan(21);
 
 select has_function(
   'public',
   'process_stream_webhook',
-  array['text', 'text', 'text', 'integer', 'integer', 'integer'],
+  array[
+    'text',
+    'text',
+    'text',
+    'integer',
+    'integer',
+    'integer',
+    'timestamp with time zone'
+  ],
   'creates the atomic Stream webhook function'
 );
 
 select ok(
   has_function_privilege(
     'service_role',
-    'public.process_stream_webhook(text,text,text,integer,integer,integer)',
+    'public.process_stream_webhook(text,text,text,integer,integer,integer,timestamp with time zone)',
     'execute'
   )
     and not has_function_privilege(
       'anon',
-      'public.process_stream_webhook(text,text,text,integer,integer,integer)',
+      'public.process_stream_webhook(text,text,text,integer,integer,integer,timestamp with time zone)',
       'execute'
     )
     and not has_function_privilege(
       'authenticated',
-      'public.process_stream_webhook(text,text,text,integer,integer,integer)',
+      'public.process_stream_webhook(text,text,text,integer,integer,integer,timestamp with time zone)',
       'execute'
     ),
   'only the service role may process Stream webhooks'
@@ -124,7 +132,8 @@ select is(
       null,
       15500,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '72 hours'
     )
   ),
   'ready:pending:1',
@@ -151,6 +160,31 @@ select isnt(
   'records when the Review becomes pending'
 );
 
+select ok(
+  (
+    select expires_at between
+      clock_timestamp() + interval '71 hours'
+      and clock_timestamp() + interval '73 hours'
+    from public.reviews
+    where id = '20000000-0000-4000-8000-000000000041'
+  ),
+  'persists the pending Review expiry atomically'
+);
+
+select is(
+  (
+    select delete_after
+    from public.evidence
+    where id = '30000000-0000-4000-8000-000000000041'
+  ),
+  (
+    select expires_at
+    from public.reviews
+    where id = '20000000-0000-4000-8000-000000000041'
+  ),
+  'keeps ready Evidence through the pending Review window'
+);
+
 select is(
   (
     select review_version
@@ -160,11 +194,21 @@ select is(
       null,
       15500,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '96 hours'
     )
   ),
   1,
   'treats duplicate ready notifications as no-ops'
+);
+
+select ok(
+  (
+    select expires_at < clock_timestamp() + interval '73 hours'
+    from public.reviews
+    where id = '20000000-0000-4000-8000-000000000041'
+  ),
+  'does not extend pending expiry for duplicate ready notifications'
 );
 
 select is(
@@ -212,7 +256,8 @@ select is(
       null,
       15500,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '72 hours'
     )
   ),
   'failed',
@@ -228,7 +273,8 @@ select is(
       null,
       15500,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '72 hours'
     )
   ),
   0,
@@ -261,12 +307,31 @@ select throws_ok(
       null,
       0,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '72 hours'
     )
   $$,
   'P0001',
   'invalid Stream webhook metadata',
   'rejects invalid ready metadata'
+);
+
+select throws_ok(
+  $$
+    select *
+    from public.process_stream_webhook(
+      'stream-ready-video',
+      'ready',
+      null,
+      15500,
+      1280,
+      720,
+      '2000-01-01 00:00:00+00'
+    )
+  $$,
+  'P0001',
+  'invalid Stream webhook metadata',
+  'rejects a pending expiry that is not in the future'
 );
 
 select is(
@@ -291,7 +356,8 @@ select is(
       null,
       15500,
       1280,
-      720
+      720,
+      clock_timestamp() + interval '72 hours'
     )
   ),
   'deleting:cancelled',
