@@ -117,6 +117,13 @@ The user decides when review is required through their prompt or agent instructi
 
 If approved, the agent continues. If changes are requested, the agent receives the reviewer’s feedback and resumes implementation.
 
+AirUX distributes reusable agent workflow guidance alongside its MCP tools so a
+user does not need to provide tool names or construct protocol payloads. A
+request such as “provide video evidence of this button working” should be
+enough for a supported coding agent to recognize the AirUX workflow, derive a
+focused capture plan from the application, submit the Review, begin waiting for
+the result, and act on the terminal decision.
+
 ### 4.4 Human Review Experience
 
 The review page should optimize for one question:
@@ -446,6 +453,29 @@ Technical requirements:
 - `airux_cancel_review` cancels a draft or pending Review.
 - Polling uses increasing intervals and server-provided retry guidance.
 - The MCP client returns the Review URL and final structured result to the coding agent.
+- The integration includes an Agent Skills-compatible `SKILL.md` workflow that
+  teaches supported coding agents when to use AirUX, how to derive MCP inputs
+  from a natural-language evidence request, and how to sequence the four tools.
+- The canonical skill uses the open Agent Skills format and avoids host-specific
+  instructions so the same workflow can be discovered by Codex and Claude Code.
+  Host-specific metadata or discovery adapters may accompany it without
+  duplicating the workflow source.
+- The skill instructs the agent to call `airux_get_review` immediately after
+  `airux_create_review` returns `pending`, remain active while that call polls,
+  and interpret the terminal result before completing the task.
+- Approval resumes the remaining task. A `changes_requested` result causes the
+  agent to apply the returned feedback, re-verify the work, create a new Review
+  with a new idempotency key, and wait for the replacement result when review is
+  still required.
+- After interruption, an agent with a known Review identifier resumes through
+  `airux_get_review`; otherwise it uses `airux_list_open_reviews` to recover a
+  matching unresolved Review before creating another one.
+- MCP initialization instructions and individual tool results reinforce the
+  same cross-tool sequence for clients that support server guidance or do not
+  activate the packaged skill.
+- Skills and MCP polling coordinate an active agent task; waking a task that has
+  already terminated requires a host notification or callback integration and
+  remains outside the MVP.
 
 ### 6.9 Retention and Cleanup
 
@@ -635,6 +665,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M6-4 | Expiration policy | Calculate and persist upload, draft, pending, playback, and evidence expiry times. | Completed | M3-1 |
 | M6-5 | Scheduled cleanup | Query due Evidence, delete Stream videos, and record deletion results. | Completed | M1-4, M4-3, M6-4 |
 | M6-6 | Cleanup reliability | Make deletion idempotent and retry failures during later Cron invocations. | Completed | M6-5 |
+| M6-7 | Agent workflow guidance | Teach Codex and Claude-compatible agents to recognize natural-language evidence requests, construct AirUX tool inputs, wait for decisions, resume after interruption, and act on feedback. | Completed | M4-6, M6-1, M6-2 |
 
 ### M7: Harden and release the MVP
 
@@ -646,7 +677,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M7-2 | Observability | Add privacy-safe error reporting, operational metrics, cleanup monitoring, and alerts. | Not Started | M1-4, M4-4, M6-5 |
 | M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Not Started | M1-4, M1-5, M1-7 |
 | M7-4 | End-to-end coverage | Test authentication, upload failures, decisions, resumption, expiry, and deletion. | Not Started | M5-6, M6-6, M7-1 |
-| M7-5 | User onboarding | Document sign-in, credential setup, MCP installation, first Review, and revocation. | Not Started | M4-6, M6-2 |
+| M7-5 | User onboarding | Package and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | Not Started | M4-6, M6-2, M6-7 |
 | M7-6 | MVP release validation | Run the production workflow end to end and confirm retention and privacy behavior. | Not Started | M7-2, M7-3, M7-4, M7-5 |
 
 ---

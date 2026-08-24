@@ -1,7 +1,7 @@
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createAiruxMcpServer } from "../src/server.js";
+import { AIRUX_MCP_INSTRUCTIONS, createAiruxMcpServer } from "../src/server.js";
 
 const REVIEW_ID = "20000000-0000-4000-8000-000000000045";
 const toolInput = {
@@ -71,6 +71,22 @@ async function connect(
 }
 
 describe("AirUX MCP server", () => {
+  it("advertises the cross-tool review workflow during MCP initialization", async () => {
+    const client = await connect(
+      vi.fn(async () => ({
+        review_id: REVIEW_ID,
+        review_url: `https://airux.example/reviews/${REVIEW_ID}`,
+        status: "pending" as const,
+      })),
+    );
+
+    expect(client.getInstructions()).toBe(AIRUX_MCP_INSTRUCTIONS);
+    expect(client.getInstructions()).toContain(
+      "immediately call airux_get_review",
+    );
+    expect(client.getInstructions()).toContain("video evidence");
+  });
+
   it("advertises and invokes airux_create_review over MCP", async () => {
     const createReview = vi.fn(async () => ({
       review_id: REVIEW_ID,
@@ -99,7 +115,12 @@ describe("AirUX MCP server", () => {
     });
     expect(result.content).toEqual([
       {
-        text: `Human review required:\nhttps://airux.example/reviews/${REVIEW_ID}`,
+        text: [
+          "Human review required:",
+          `https://airux.example/reviews/${REVIEW_ID}`,
+          `Review ID: ${REVIEW_ID}`,
+          "Next: immediately call airux_get_review with this Review ID and wait for the human decision before finishing the active task.",
+        ].join("\n"),
         type: "text",
       },
     ]);
@@ -247,7 +268,12 @@ describe("AirUX MCP server", () => {
     });
     expect(result.content).toEqual([
       {
-        text: `AirUX review changes requested:\nhttps://airux.example/reviews/${REVIEW_ID}\nFeedback: The menu overlaps the heading.`,
+        text: [
+          "AirUX review changes requested:",
+          `https://airux.example/reviews/${REVIEW_ID}`,
+          "Feedback: The menu overlaps the heading.",
+          "Next: Apply the feedback, verify the change, and submit a new Review if visual review is still required.",
+        ].join("\n"),
         type: "text",
       },
     ]);

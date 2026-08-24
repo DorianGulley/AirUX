@@ -25,6 +25,15 @@ import { createAiruxReview } from "./create-review.js";
 import { getAiruxReview } from "./get-review.js";
 import { listAiruxOpenReviews } from "./list-open-reviews.js";
 
+export const AIRUX_MCP_INSTRUCTIONS = [
+  "Use AirUX when the user requests video evidence, visual proof, a recorded localhost demonstration, remote approval, or asynchronous human review of web work.",
+  "Derive the title, claim, human-visible criteria, and constrained capture plan from the request and inspected application; do not require the user to construct an MCP payload.",
+  "After airux_create_review returns pending, show its URL and immediately call airux_get_review with its review_id. Do not finish the active task while that wait is pending.",
+  "On approval, continue the remaining authorized task. When changes are requested, apply the Decision feedback, verify the change, and submit and await a new Review if visual review is still required.",
+  "After an interrupted task, resume a known review_id with airux_get_review or use airux_list_open_reviews to recover an unresolved Review before creating a duplicate.",
+  "Do not claim that AirUX can wake an agent task after its host has terminated it.",
+].join(" ");
+
 export interface AiruxMcpServerOptions {
   readonly config?: AiruxRuntimeConfig;
   readonly cancelReview?: (
@@ -62,6 +71,24 @@ function openReviewsText(output: ListOpenReviewsToolOutput) {
     ),
     "Use airux_get_review with a Review ID to resume waiting for its result.",
   ].join("\n\n");
+}
+
+function reviewResultText(output: GetReviewToolOutput) {
+  const feedback = output.decision?.comment;
+  const nextAction =
+    output.status === "approved"
+      ? "Continue the remaining authorized task."
+      : output.status === "changes_requested"
+        ? "Apply the feedback, verify the change, and submit a new Review if visual review is still required."
+        : "Do not present this work as approved; create a replacement only if review is still required.";
+  return [
+    `AirUX review ${output.status.replace("_", " ")}:`,
+    output.review_url,
+    ...(feedback === null || feedback === undefined
+      ? []
+      : [`Feedback: ${feedback}`]),
+    `Next: ${nextAction}`,
+  ].join("\n");
 }
 
 export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
@@ -111,7 +138,10 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
     throw new Error("AirUX MCP server configuration is required");
   }
 
-  const server = new McpServer({ name: "airux", version: "0.1.0" });
+  const server = new McpServer(
+    { name: "airux", version: "0.1.0" },
+    { instructions: AIRUX_MCP_INSTRUCTIONS },
+  );
   server.registerTool(
     "airux_cancel_review",
     {
@@ -160,7 +190,7 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
         readOnlyHint: false,
       },
       description:
-        "Record a constrained localhost browser flow and submit it to AirUX for human review.",
+        "Turn a request for video evidence or visual proof into a constrained localhost recording and submit it for human review. After this returns pending, immediately call airux_get_review with the returned review_id.",
       inputSchema: createReviewToolInputSchema,
       outputSchema: createReviewToolOutputSchema,
       title: "Create AirUX Review",
@@ -172,7 +202,12 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
           content: [
             {
               type: "text",
-              text: `Human review required:\n${output.review_url}`,
+              text: [
+                "Human review required:",
+                output.review_url,
+                `Review ID: ${output.review_id}`,
+                "Next: immediately call airux_get_review with this Review ID and wait for the human decision before finishing the active task.",
+              ].join("\n"),
             },
           ],
           structuredContent: output,
@@ -199,7 +234,7 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
         readOnlyHint: true,
       },
       description:
-        "Wait for an AirUX human review to resolve and return its decision.",
+        "Wait locally for an AirUX human review to resolve, then return the terminal status and Decision so the active agent task can continue.",
       inputSchema: getReviewToolInputSchema,
       outputSchema: getReviewToolOutputSchema,
       title: "Get AirUX Review Result",
@@ -207,18 +242,11 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
     async (input, context) => {
       try {
         const output = await getReview(input, context.mcpReq.signal);
-        const feedback = output.decision?.comment;
         return {
           content: [
             {
               type: "text",
-              text: [
-                `AirUX review ${output.status.replace("_", " ")}:`,
-                output.review_url,
-                ...(feedback === null || feedback === undefined
-                  ? []
-                  : [`Feedback: ${feedback}`]),
-              ].join("\n"),
+              text: reviewResultText(output),
             },
           ],
           structuredContent: output,
