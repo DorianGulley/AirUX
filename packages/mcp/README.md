@@ -27,6 +27,26 @@ pnpm mcp:start
 and loopback development origins. Stdout is reserved for MCP JSON-RPC messages;
 transport diagnostics use stderr and never include API responses or credentials.
 
+## Agent workflow guidance
+
+The server publishes MCP initialization instructions that describe when to use
+AirUX and how to sequence creation, polling, feedback, and recovery. MCP clients
+that support server instructions receive that guidance when they connect.
+
+The host-neutral Agent Skills source lives at `skills/airux-review`. Repository
+discovery adapters expose that same directory to Codex through
+`.agents/skills/airux-review` and to Claude Code through
+`.claude/skills/airux-review`; both adapters are symlinks so the workflow cannot
+drift between hosts. The skill activates for natural-language requests such as
+“provide video evidence of this button working,” derives the tool input from the
+request and inspected localhost application, and immediately invokes
+`airux_get_review` after creation. Customer plugin packaging is deferred to the
+M7 onboarding work.
+
+The skill and result poll coordinate an active agent task. They persist Review
+state across interruption, but cannot wake a task after its agent host has
+terminated it.
+
 ## Tool contract
 
 `airux_create_review` accepts:
