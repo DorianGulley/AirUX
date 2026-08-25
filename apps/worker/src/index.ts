@@ -10,6 +10,10 @@ import {
 } from "./agent-reviews.js";
 import { jsonResponse } from "./api-response.js";
 import { type AiruxConfig, loadConfig } from "./config.js";
+import {
+  recordScheduledCleanupCompleted,
+  recordScheduledCleanupFailed,
+} from "./operational-log.js";
 import { handleReviewPlaybackToken } from "./review-playback.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
 import {
@@ -17,7 +21,10 @@ import {
   handleReviewerReviewDelete,
   handleReviewerReviewGet,
 } from "./reviewer-reviews.js";
-import { runScheduledCleanup } from "./scheduled-cleanup.js";
+import {
+  runScheduledCleanup,
+  ScheduledCleanupError,
+} from "./scheduled-cleanup.js";
 import { deleteStreamVideo } from "./stream-video-deletion.js";
 import { handleStreamWebhook } from "./stream-webhook.js";
 
@@ -422,18 +429,34 @@ const worker = {
     try {
       config = loadConfig(env);
     } catch {
+      recordScheduledCleanupFailed("configuration", {
+        selected: 0,
+        deleted: 0,
+        failed: 0,
+      });
       throw new Error("Scheduled cleanup configuration unavailable");
     }
 
-    await runScheduledCleanup(
-      config,
-      {
-        stream: {
-          deleteVideo: (id) => deleteStreamVideo(env.STREAM.video(id)),
+    try {
+      const result = await runScheduledCleanup(
+        config,
+        {
+          stream: {
+            deleteVideo: (id) => deleteStreamVideo(env.STREAM.video(id)),
+          },
         },
-      },
-      new Date(controller.scheduledTime),
-    );
+        new Date(controller.scheduledTime),
+      );
+      recordScheduledCleanupCompleted({ ...result, failed: 0 });
+    } catch (error) {
+      recordScheduledCleanupFailed(
+        "execution",
+        error instanceof ScheduledCleanupError
+          ? error.summary
+          : { selected: 0, deleted: 0, failed: 0 },
+      );
+      throw error;
+    }
   },
 } satisfies ExportedHandler<Env>;
 

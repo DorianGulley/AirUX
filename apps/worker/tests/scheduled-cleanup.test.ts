@@ -111,7 +111,9 @@ describe("scheduled Evidence cleanup", () => {
 
     await expect(
       runScheduledCleanup(CONFIG, { fetcher, stream }, NOW),
-    ).rejects.toEqual(new ScheduledCleanupError());
+    ).rejects.toEqual(
+      new ScheduledCleanupError({ selected: 2, deleted: 1, failed: 1 }),
+    );
     expect(completed).toEqual([SECOND_EVIDENCE_ID]);
   });
 

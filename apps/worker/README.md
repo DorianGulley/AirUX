@@ -147,6 +147,12 @@ overlapping Cron invocations return the original deletion result without
 changing `deleted_at`. Other provider and database failures still fail the
 Cron invocation and remain eligible for a later scheduled retry.
 
+Every scheduled invocation emits one allowlisted JSON event. Successful runs
+emit `scheduled_cleanup_completed`; failed configuration or execution emits
+`scheduled_cleanup_failed`. Events contain only the stage and aggregate
+`selected`, `deleted`, and `failed` counts. They intentionally exclude Review,
+Evidence, Stream, and user identifiers as well as exception and provider text.
+
 Stream sends processing results to:
 
 ```text
@@ -164,8 +170,13 @@ acknowledged without reopening terminal state or extending retention.
 JSON request bodies and upstream JSON responses are read through explicit byte
 limits, and client errors never include provider response bodies. The Worker
 does not log authorization headers, request bodies, claims, comments, bearer
-credentials, or signed URLs; future M7-2 observability must preserve that
-allowlist-only boundary.
+credentials, or signed URLs. The development Wrangler environment persists
+application logs at full sampling and traces at five-percent head sampling.
+Automatic invocation logs are disabled so request metadata is not retained.
+Cloudflare's built-in Worker metrics still provide request volume, status,
+invocation-error, CPU-time, and wall-time telemetry without adding another
+metrics service. Application logs remain allowlist-only: only the fixed-schema
+scheduled-cleanup events above are emitted.
 
 Cloudflare permits one Stream webhook subscription per account. Register the
 environment's public endpoint through the Stream API, then store the returned

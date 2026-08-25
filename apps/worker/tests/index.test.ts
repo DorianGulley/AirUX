@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { hashAgentCredentialToken } from "../src/agent-credential-token.js";
 import worker from "../src/index.js";
+import { ScheduledCleanupError } from "../src/scheduled-cleanup.js";
 import { TEST_ENV } from "./fixtures.js";
 
 const CREDENTIAL_ID = "dc0fb4f8-652b-4e12-8899-e12c34afbcde";
@@ -19,6 +20,7 @@ function authenticatedReviewerResponse() {
 
 describe("AirUX Worker", () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     Reflect.deleteProperty(crypto.subtle, "timingSafeEqual");
   });
@@ -427,6 +429,7 @@ describe("AirUX Worker", () => {
       },
     );
     vi.stubGlobal("fetch", fetcher);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     await worker.scheduled(
       { scheduledTime, cron: "*/15 * * * *", noRetry: vi.fn() },
@@ -434,6 +437,12 @@ describe("AirUX Worker", () => {
     );
 
     expect(fetcher).toHaveBeenCalledOnce();
+    expect(info).toHaveBeenCalledExactlyOnceWith({
+      event: "scheduled_cleanup_completed",
+      selected: 0,
+      deleted: 0,
+      failed: 0,
+    });
   });
 
   it("records cleanup when Stream reports that the video is already gone", async () => {
@@ -475,6 +484,7 @@ describe("AirUX Worker", () => {
       video: vi.fn(() => ({ delete: deleteVideo })),
     } as StreamBinding;
     vi.stubGlobal("fetch", fetcher);
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
 
     await worker.scheduled(
       { scheduledTime, cron: "*/15 * * * *", noRetry: vi.fn() },
@@ -486,6 +496,62 @@ describe("AirUX Worker", () => {
     );
     expect(deleteVideo).toHaveBeenCalledOnce();
     expect(completed).toEqual([evidenceId]);
+  });
+
+  it("records only bounded cleanup metrics when scheduled cleanup fails", async () => {
+    const scheduledTime = Date.parse("2026-08-22T04:30:00.000Z");
+    const privateFailure = "private database response";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(privateFailure, { status: 503 })),
+    );
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      worker.scheduled(
+        { scheduledTime, cron: "*/15 * * * *", noRetry: vi.fn() },
+        TEST_ENV,
+      ),
+    ).rejects.toBeInstanceOf(ScheduledCleanupError);
+
+    expect(error).toHaveBeenCalledExactlyOnceWith({
+      event: "scheduled_cleanup_failed",
+      stage: "execution",
+      selected: 0,
+      deleted: 0,
+      failed: 0,
+    });
+    expect(error.mock.calls.flat().join(" ")).not.toContain(privateFailure);
+  });
+
+  it("records a safe cleanup configuration failure", async () => {
+    const error = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      worker.scheduled(
+        {
+          scheduledTime: Date.parse("2026-08-22T04:30:00.000Z"),
+          cron: "*/15 * * * *",
+          noRetry: vi.fn(),
+        },
+        { ...TEST_ENV, SUPABASE_SECRET_KEY: "private invalid value" },
+      ),
+    ).rejects.toThrow("Scheduled cleanup configuration unavailable");
+
+    expect(error).toHaveBeenCalledExactlyOnceWith({
+      event: "scheduled_cleanup_failed",
+      stage: "configuration",
+      selected: 0,
+      deleted: 0,
+      failed: 0,
+    });
+    expect(error.mock.calls.flat().join(" ")).not.toContain(
+      "private invalid value",
+    );
   });
 
   it("fails closed without exposing invalid configuration", async () => {

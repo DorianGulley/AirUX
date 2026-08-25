@@ -27,13 +27,29 @@ export interface ScheduledCleanupDependencies {
   readonly fetcher?: Fetcher;
 }
 
+export interface ScheduledCleanupSummary {
+  readonly selected: number;
+  readonly deleted: number;
+  readonly failed: number;
+}
+
 interface DueEvidence {
   readonly evidenceId: string;
   readonly reviewId: string;
   readonly streamVideoId: string | null;
 }
 
-export class ScheduledCleanupError extends Error {}
+export class ScheduledCleanupError extends Error {
+  readonly summary: ScheduledCleanupSummary;
+
+  constructor(
+    summary: ScheduledCleanupSummary = { selected: 0, deleted: 0, failed: 0 },
+  ) {
+    super("Scheduled cleanup failed");
+    this.name = "ScheduledCleanupError";
+    this.summary = summary;
+  }
+}
 
 function asRecord(value: unknown) {
   return typeof value === "object" && value !== null
@@ -198,7 +214,11 @@ export async function runScheduledCleanup(
   }
 
   if (failed > 0) {
-    throw new ScheduledCleanupError();
+    throw new ScheduledCleanupError({
+      selected: evidenceRows.length,
+      deleted,
+      failed,
+    });
   }
   return { selected: evidenceRows.length, deleted };
 }
