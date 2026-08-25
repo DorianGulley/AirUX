@@ -1,6 +1,8 @@
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { AiruxApiError } from "../src/api-client.js";
+import { CreateReviewWorkflowError } from "../src/create-review.js";
 import { AIRUX_MCP_INSTRUCTIONS, createAiruxMcpServer } from "../src/server.js";
 
 const REVIEW_ID = "20000000-0000-4000-8000-000000000045";
@@ -49,11 +51,15 @@ async function connect(
     review_url: `https://airux.example/reviews/${REVIEW_ID}`,
     status: "cancelled" as const,
   })),
+  apiOrigin?: string,
 ) {
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const server = createAiruxMcpServer({
     cancelReview,
+    ...(apiOrigin === undefined
+      ? {}
+      : { config: { agentToken: "unused-test-token", apiOrigin } }),
     createReview,
     getReview,
     listOpenReviews,
@@ -297,5 +303,161 @@ describe("AirUX MCP server", () => {
     expect(JSON.stringify(result)).not.toContain(
       "secret-token-and-provider-url",
     );
+    expect(JSON.stringify(result)).toContain(
+      "unexpected local review-creation error",
+    );
   });
+
+  it("explains how to fix an invalid agent credential without exposing it", async () => {
+    const client = await connect(
+      async () => {
+        throw new CreateReviewWorkflowError(
+          "create",
+          "secret workflow failure",
+          {
+            cause: new AiruxApiError("secret API response", {
+              code: "authentication_required",
+              retryable: false,
+              status: 401,
+            }),
+          },
+        );
+      },
+      undefined,
+      undefined,
+      undefined,
+      "https://airux.example",
+    );
+
+    const result = await client.callTool({
+      arguments: toolInput,
+      name: "airux_create_review",
+    });
+    const serialized = JSON.stringify(result);
+
+    expect(result.isError).toBe(true);
+    expect(serialized).toContain("Invalid AirUX agent credential");
+    expect(serialized).toContain("https://airux.example/#credential-manager");
+    expect(serialized).toContain(
+      "AIRUX_AGENT_TOKEN=airux_agent_v1.<credential-id>.<secret>",
+    );
+    expect(serialized).not.toContain("secret workflow failure");
+    expect(serialized).not.toContain("secret API response");
+  });
+
+  it.each([
+    {
+      error: new AiruxApiError("private rejection", {
+        code: "invalid_request",
+        retryable: false,
+        status: 400,
+      }),
+      expected: "Check the title, claim, criteria, recording size",
+    },
+    {
+      error: new AiruxApiError("private conflict", {
+        code: "conflict",
+        retryable: false,
+        status: 409,
+      }),
+      expected: "Reuse an ID only when retrying identical input",
+    },
+    {
+      error: new AiruxApiError("private rate limit", {
+        code: "rate_limited",
+        retryAfterMs: 4_200,
+        retryable: true,
+        status: 429,
+      }),
+      expected: "Wait at least 5 seconds",
+    },
+    {
+      error: new AiruxApiError("private outage", {
+        code: "internal_error",
+        retryable: true,
+        status: 503,
+      }),
+      expected: "Check network access and AirUX service availability",
+    },
+    {
+      error: new AiruxApiError("private wrong endpoint", {
+        code: "not_found",
+        retryable: false,
+        status: 404,
+      }),
+      expected: "does not expose review creation",
+    },
+  ])(
+    "returns actionable API failure guidance: $expected",
+    async ({ error, expected }) => {
+      const client = await connect(async () => {
+        throw new CreateReviewWorkflowError("create", "private wrapper", {
+          cause: error,
+        });
+      });
+
+      const result = await client.callTool({
+        arguments: toolInput,
+        name: "airux_create_review",
+      });
+      const serialized = JSON.stringify(result);
+
+      expect(result.isError).toBe(true);
+      expect(serialized).toContain(expected);
+      expect(serialized).not.toContain(error.message);
+      expect(serialized).not.toContain("private wrapper");
+    },
+  );
+
+  it.each([
+    {
+      stage: "capture" as const,
+      message: "Invalid tool input",
+      expected: "rejected the review request before capture",
+    },
+    {
+      stage: "capture" as const,
+      message: "private workflow failure",
+      expected: "Confirm the localhost app is running",
+    },
+    {
+      stage: "create" as const,
+      message: "private workflow failure",
+      expected: "Confirm AIRUX_API_ORIGIN and AIRUX_AGENT_TOKEN",
+    },
+    {
+      stage: "upload" as const,
+      message: "private workflow failure",
+      expected: "could not upload it to private video storage",
+    },
+    {
+      stage: "processing" as const,
+      message: "private workflow failure",
+      expected: "resume it with airux_get_review",
+    },
+    {
+      stage: "cleanup" as const,
+      message: "private workflow failure",
+      expected: "airux-browser-recording-*",
+    },
+  ])(
+    "returns actionable $stage failure guidance",
+    async ({ stage, message, expected }) => {
+      const client = await connect(async () => {
+        throw new CreateReviewWorkflowError(stage, message);
+      });
+
+      const result = await client.callTool({
+        arguments: toolInput,
+        name: "airux_create_review",
+      });
+      const serialized = JSON.stringify(result);
+
+      expect(result.isError).toBe(true);
+      expect(serialized).toContain(expected);
+      if (message === "private workflow failure") {
+        expect(serialized).not.toContain(message);
+      }
+    },
+  );
 });
