@@ -41,6 +41,11 @@
       "name": "CREDENTIAL_CREATE_RATE_LIMITER",
       "namespace_id": "742091002",
       "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "AGENT_REVIEW_CREATE_RATE_LIMITER",
+      "namespace_id": "742091003",
+      "simple": { "limit": 10, "period": 60 }
     }
   ],
   "env": {
@@ -75,6 +80,11 @@
         {
           "name": "CREDENTIAL_CREATE_RATE_LIMITER",
           "namespace_id": "742091002",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "AGENT_REVIEW_CREATE_RATE_LIMITER",
+          "namespace_id": "742091003",
           "simple": { "limit": 10, "period": 60 }
         }
       ]

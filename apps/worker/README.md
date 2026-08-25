@@ -30,7 +30,7 @@ provider, and passes only the authenticated user ID to the route handler.
 Access tokens and provider error bodies must not be logged or returned to
 clients.
 
-Credential endpoints are protected by two Cloudflare rate-limit bindings.
+Reviewer-facing endpoints are protected by two Cloudflare rate-limit bindings.
 Authentication attempts are limited to 120 requests per minute per source IP,
 and credential creation is additionally limited to 10 requests per minute per
 reviewer. Limiter failures fail closed. The database independently caps each
@@ -65,6 +65,9 @@ against the stored digest. Successful authentication exposes only the
 credential ID and owning user ID to agent route handlers. Agent credentials are
 never accepted by reviewer routes, and authentication never returns the stored
 digest or provider details. `last_used_at` tracking is intentionally deferred.
+Creating Reviews is limited to 10 requests per minute per authenticated agent
+credential before AirUX allocates a Stream upload slot. Read polling and
+cancellation are not charged against that creation limit.
 
 Authenticated reviewers retrieve and decide their Reviews through:
 
@@ -157,6 +160,12 @@ Evidence to `ready`, move a draft Review to `pending`, and persist the 72-hour
 pending and Evidence expirations. Error notifications transition only the
 Evidence to `failed`. Duplicate and unrelated signed notifications are
 acknowledged without reopening terminal state or extending retention.
+
+JSON request bodies and upstream JSON responses are read through explicit byte
+limits, and client errors never include provider response bodies. The Worker
+does not log authorization headers, request bodies, claims, comments, bearer
+credentials, or signed URLs; future M7-2 observability must preserve that
+allowlist-only boundary.
 
 Cloudflare permits one Stream webhook subscription per account. Register the
 environment's public endpoint through the Stream API, then store the returned
