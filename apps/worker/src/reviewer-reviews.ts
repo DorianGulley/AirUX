@@ -2,9 +2,11 @@ import {
   type DecisionRequest,
   decideReviewerReviewResponseSchema,
   decisionRequestSchema,
+  evidenceStateSchema,
   getReviewerReviewResponseSchema,
   type ReviewerReview,
   reviewerReviewSchema,
+  reviewStateSchema,
 } from "@airux/shared/v1";
 
 import { jsonResponse } from "./api-response.js";
@@ -296,6 +298,66 @@ function normalizeDecisionResult(
   return normalized;
 }
 
+function normalizeDeletionResult(value: unknown, reviewId: string) {
+  const row = asRecord(value);
+  const reviewStatus = reviewStateSchema.safeParse(row?.review_status);
+  const evidenceStatus = evidenceStateSchema.safeParse(row?.evidence_status);
+  if (
+    row === null ||
+    row.review_id !== reviewId ||
+    !reviewStatus.success ||
+    !["approved", "changes_requested", "cancelled", "expired"].includes(
+      reviewStatus.data,
+    ) ||
+    typeof row.review_version !== "number" ||
+    !Number.isSafeInteger(row.review_version) ||
+    row.review_version < 0 ||
+    normalizeTimestamp(row.review_deleted_at) === null ||
+    typeof row.evidence_id !== "string" ||
+    !UUID_PATTERN.test(row.evidence_id) ||
+    !evidenceStatus.success ||
+    (evidenceStatus.data !== "deleting" && evidenceStatus.data !== "deleted") ||
+    normalizeTimestamp(row.evidence_delete_after) === null
+  ) {
+    throw new ReviewerReviewServiceError();
+  }
+}
+
+async function deleteReview(
+  reviewId: string,
+  reviewer: AuthenticatedReviewer,
+  config: AiruxConfig,
+  fetcher: Fetcher,
+) {
+  if (!UUID_PATTERN.test(reviewId)) {
+    throw new ReviewerReviewNotFoundError();
+  }
+
+  const response = await fetchData(
+    dataApiUrl(config, "rpc/delete_reviewer_review"),
+    {
+      method: "POST",
+      headers: dataApiHeaders(config),
+      body: JSON.stringify({
+        p_review_id: reviewId,
+        p_user_id: reviewer.id,
+      }),
+    },
+    fetcher,
+  );
+  if (!response.ok) {
+    throw new ReviewerReviewServiceError();
+  }
+  const rows = await readRows(response);
+  if (rows.length === 0) {
+    throw new ReviewerReviewNotFoundError();
+  }
+  if (rows.length !== 1) {
+    throw new ReviewerReviewServiceError();
+  }
+  normalizeDeletionResult(rows[0], reviewId);
+}
+
 async function writeDecision(
   request: Request,
   reviewId: string,
@@ -392,6 +454,23 @@ export async function handleReviewerReviewGet(
         review: await getReview(reviewId, reviewer, config, fetcher),
       }),
     );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function handleReviewerReviewDelete(
+  reviewId: string,
+  reviewer: AuthenticatedReviewer,
+  config: AiruxConfig,
+  fetcher: Fetcher = fetch,
+) {
+  try {
+    await deleteReview(reviewId, reviewer, config, fetcher);
+    return new Response(null, {
+      status: 204,
+      headers: { "cache-control": "no-store" },
+    });
   } catch (error) {
     return errorResponse(error);
   }

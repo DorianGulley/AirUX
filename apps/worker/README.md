@@ -69,18 +69,25 @@ digest or provider details. `last_used_at` tracking is intentionally deferred.
 Authenticated reviewers retrieve and decide their Reviews through:
 
 ```text
-GET  /api/v1/reviews/:id
-POST /api/v1/evidence/:id/playback-token
-POST /api/v1/reviews/:id/decision
+GET    /api/v1/reviews/:id
+DELETE /api/v1/reviews/:id
+POST   /api/v1/evidence/:id/playback-token
+POST   /api/v1/reviews/:id/decision
 ```
 
-Both routes filter by the authenticated reviewer ID and return the same `404`
+These routes filter by the authenticated reviewer ID and return the same `404`
 for malformed, missing, deleted, or foreign Review IDs. Reviewer responses
 include the presentation metadata and terminal Decision while omitting owner,
 credential, Stream, and deletion fields. Decisions require the current Review
 version and are committed with the terminal state transition in one Postgres
 transaction. Stale, repeated, and already-terminal submissions return `409`;
 requesting changes also requires a non-empty comment.
+
+Reviewer deletion immediately soft-deletes the owned Review, revokes reviewer,
+playback, decision, and agent access, and makes its Evidence due for scheduled
+cleanup. An open Review is first cancelled; an existing terminal outcome and
+Decision are preserved. Repeating the deletion is an idempotent `204` and does
+not advance the Review version or expose deletion metadata.
 
 The playback endpoint first resolves an owned, nondeleted Review from ready
 Evidence, then verifies that Stream reports the video as ready and protected by

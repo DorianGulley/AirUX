@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { loadConfig } from "../src/config.js";
 import {
   handleReviewerReviewDecision,
+  handleReviewerReviewDelete,
   handleReviewerReviewGet,
 } from "../src/reviewer-reviews.js";
 import { TEST_ENV } from "./fixtures.js";
@@ -248,6 +249,96 @@ describe("reviewer Review retrieval", () => {
 
     expect(response.status).toBe(503);
     expect(await response.text()).not.toContain(OTHER_REVIEWER_ID);
+  });
+});
+
+describe("reviewer Review deletion", () => {
+  function deletionRow(overrides: Record<string, unknown> = {}) {
+    return {
+      review_id: REVIEW_ID,
+      review_status: "cancelled",
+      review_version: 2,
+      review_deleted_at: NOW.toISOString(),
+      evidence_id: EVIDENCE_ID,
+      evidence_status: "deleting",
+      evidence_delete_after: NOW.toISOString(),
+      ...overrides,
+    };
+  }
+
+  it("deletes an owned Review through the atomic transaction", async () => {
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        expect(String(input)).toBe(
+          "https://example.supabase.co/rest/v1/rpc/delete_reviewer_review",
+        );
+        expect(init).toMatchObject({ method: "POST", redirect: "manual" });
+        expect(JSON.parse(String(init?.body))).toEqual({
+          p_review_id: REVIEW_ID,
+          p_user_id: REVIEWER.id,
+        });
+        return Response.json([deletionRow()]);
+      },
+    );
+
+    const response = await handleReviewerReviewDelete(
+      REVIEW_ID,
+      REVIEWER,
+      CONFIG,
+      fetcher,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.text()).resolves.toBe("");
+  });
+
+  it("uses the same not-found response for malformed, missing, and foreign Reviews", async () => {
+    const noFetch = vi.fn();
+    const malformed = await handleReviewerReviewDelete(
+      "not-a-uuid",
+      REVIEWER,
+      CONFIG,
+      noFetch,
+    );
+    expect(noFetch).not.toHaveBeenCalled();
+
+    const emptyFetcher = vi.fn(async () => Response.json([]));
+    const missing = await handleReviewerReviewDelete(
+      REVIEW_ID,
+      REVIEWER,
+      CONFIG,
+      emptyFetcher,
+    );
+    const foreign = await handleReviewerReviewDelete(
+      REVIEW_ID,
+      REVIEWER,
+      CONFIG,
+      emptyFetcher,
+    );
+
+    for (const response of [malformed, missing, foreign]) {
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: { code: "not_found", message: "Not found" },
+      });
+    }
+  });
+
+  it("fails closed on a malformed transaction result", async () => {
+    const response = await handleReviewerReviewDelete(
+      REVIEW_ID,
+      REVIEWER,
+      CONFIG,
+      vi.fn(async () =>
+        Response.json([deletionRow({ evidence_status: "ready" })]),
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "internal_error", message: "Service unavailable" },
+    });
   });
 });
 

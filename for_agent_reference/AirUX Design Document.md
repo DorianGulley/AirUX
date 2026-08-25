@@ -678,6 +678,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M6-5 | Scheduled cleanup | Query due Evidence, delete Stream videos, and record deletion results. | Completed | M1-4, M4-3, M6-4 |
 | M6-6 | Cleanup reliability | Make deletion idempotent and retry failures during later Cron invocations. | Completed | M6-5 |
 | M6-7 | Agent workflow guidance | Teach Codex and Claude-compatible agents to recognize natural-language evidence requests, construct AirUX tool inputs, wait for decisions, resume after interruption, and act on feedback. | Completed | M4-6, M6-1, M6-2 |
+| M6-8 | Reviewer deletion | Implement owner-authorized, idempotent Review deletion with immediate access revocation and Evidence cleanup scheduling. | Completed | M3-3, M6-6 |
 
 ### M7: Harden and release the MVP
 
