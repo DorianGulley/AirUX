@@ -67,7 +67,7 @@ interface StoredReview {
   readonly submitted_at: string | null;
   readonly expires_at: string;
   resolved_at: string | null;
-  readonly deleted_at: null;
+  deleted_at: string | null;
 }
 
 interface StoredEvidence {
@@ -442,6 +442,44 @@ async function installContractBackend() {
         ]);
       }
 
+      if (url.pathname === "/rest/v1/rpc/delete_reviewer_review") {
+        const review = reviews.find(
+          (item) =>
+            item.id === body.p_review_id && item.user_id === body.p_user_id,
+        );
+        if (review === undefined) {
+          return Response.json([]);
+        }
+        const item = evidence.find(
+          (candidate) => candidate.review_id === review.id,
+        );
+        if (item === undefined) {
+          return new Response(null, { status: 500 });
+        }
+        if (
+          review.deleted_at === null &&
+          (review.status === "draft" || review.status === "pending")
+        ) {
+          review.status = "cancelled";
+          review.version += 1;
+          review.resolved_at = RESOLVED_AT;
+        }
+        review.deleted_at ??= RESOLVED_AT;
+        item.status = "deleting";
+        item.delete_after = RESOLVED_AT;
+        return Response.json([
+          {
+            review_id: review.id,
+            review_status: review.status,
+            review_version: review.version,
+            review_deleted_at: review.deleted_at,
+            evidence_id: item.id,
+            evidence_status: item.status,
+            evidence_delete_after: item.delete_after,
+          },
+        ]);
+      }
+
       if (url.pathname === "/rest/v1/reviews") {
         const reviewId = equalFilter(url, "id");
         const userId = equalFilter(url, "user_id");
@@ -507,7 +545,7 @@ async function installContractBackend() {
 function agentRequest(
   path: string,
   token: string,
-  method: "GET" | "POST" = "GET",
+  method: "GET" | "POST" | "DELETE" = "GET",
   body?: unknown,
 ) {
   return new Request(`https://airux.app${path}`, {
@@ -523,7 +561,7 @@ function agentRequest(
 function reviewerRequest(
   path: string,
   token: string,
-  method: "GET" | "POST" = "GET",
+  method: "GET" | "POST" | "DELETE" = "GET",
   body?: unknown,
 ) {
   return agentRequest(path, token, method, body);
@@ -659,6 +697,22 @@ describe("Review API contracts", () => {
       ),
       backend.env,
     );
+    const reviewerForeignDeletion = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${PENDING_REVIEW_B_ID}`,
+        REVIEWER_A_TOKEN,
+        "DELETE",
+      ),
+      backend.env,
+    );
+    const reviewerMissingDeletion = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${MISSING_REVIEW_ID}`,
+        REVIEWER_A_TOKEN,
+        "DELETE",
+      ),
+      backend.env,
+    );
 
     expect(agentForeign.status).toBe(404);
     expect(agentMissing.status).toBe(404);
@@ -677,6 +731,11 @@ describe("Review API contracts", () => {
       await reviewerMissingPlayback.text(),
     );
     expect(foreignDecision.status).toBe(404);
+    expect(reviewerForeignDeletion.status).toBe(404);
+    expect(reviewerMissingDeletion.status).toBe(404);
+    expect(await reviewerForeignDeletion.text()).toBe(
+      await reviewerMissingDeletion.text(),
+    );
     expect(backend.decisions).toHaveLength(0);
   });
 
@@ -765,6 +824,80 @@ describe("Review API contracts", () => {
       backend.evidence.find((item) => item.id === CREATED_EVIDENCE_ID)
         ?.delete_after,
     ).toBe(RESOLVED_AT);
+  });
+
+  it("immediately revokes access and idempotently schedules evidence cleanup", async () => {
+    const backend = await installContractBackend();
+    const firstDeletion = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${PENDING_REVIEW_A_ID}`,
+        REVIEWER_A_TOKEN,
+        "DELETE",
+      ),
+      backend.env,
+    );
+    const deletionRetry = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${PENDING_REVIEW_A_ID}`,
+        REVIEWER_A_TOKEN,
+        "DELETE",
+      ),
+      backend.env,
+    );
+
+    expect(firstDeletion.status).toBe(204);
+    expect(deletionRetry.status).toBe(204);
+    expect(firstDeletion.headers.get("cache-control")).toBe("no-store");
+    const review = backend.reviews.find(
+      (item) => item.id === PENDING_REVIEW_A_ID,
+    );
+    expect(review).toMatchObject({
+      status: "cancelled",
+      version: 2,
+      resolved_at: RESOLVED_AT,
+      deleted_at: RESOLVED_AT,
+    });
+    expect(
+      backend.evidence.find((item) => item.id === PENDING_EVIDENCE_A_ID),
+    ).toMatchObject({ status: "deleting", delete_after: RESOLVED_AT });
+
+    const reviewerDetail = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${PENDING_REVIEW_A_ID}`,
+        REVIEWER_A_TOKEN,
+      ),
+      backend.env,
+    );
+    const playback = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/evidence/${PENDING_EVIDENCE_A_ID}/playback-token`,
+        REVIEWER_A_TOKEN,
+        "POST",
+      ),
+      backend.env,
+    );
+    const decision = await worker.fetch(
+      reviewerRequest(
+        `/api/v1/reviews/${PENDING_REVIEW_A_ID}/decision`,
+        REVIEWER_A_TOKEN,
+        "POST",
+        { expected_version: 2, outcome: "approved" },
+      ),
+      backend.env,
+    );
+    const agentDetail = await worker.fetch(
+      agentRequest(
+        `/api/v1/agent/reviews/${PENDING_REVIEW_A_ID}`,
+        AGENT_A_TOKEN,
+      ),
+      backend.env,
+    );
+
+    expect(reviewerDetail.status).toBe(404);
+    expect(playback.status).toBe(404);
+    expect(decision.status).toBe(404);
+    expect(agentDetail.status).toBe(404);
+    expect(backend.decisions).toHaveLength(0);
   });
 
   it("allows exactly one version-checked terminal Decision", async () => {

@@ -311,6 +311,9 @@ describe("AirUX Worker", () => {
 
     for (const request of [
       new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`),
+      new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`, {
+        method: "DELETE",
+      }),
       new Request(
         `https://airux.app/api/v1/reviews/${CREDENTIAL_ID}/decision`,
         {
@@ -338,7 +341,7 @@ describe("AirUX Worker", () => {
       TEST_ENV,
     );
     expect(detail.status).toBe(405);
-    expect(detail.headers.get("allow")).toBe("GET");
+    expect(detail.headers.get("allow")).toBe("GET, DELETE");
 
     const decision = worker.fetch(
       new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}/decision`),

@@ -14,6 +14,7 @@ import { handleReviewPlaybackToken } from "./review-playback.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
 import {
   handleReviewerReviewDecision,
+  handleReviewerReviewDelete,
   handleReviewerReviewGet,
 } from "./reviewer-reviews.js";
 import { runScheduledCleanup } from "./scheduled-cleanup.js";
@@ -366,7 +367,7 @@ const worker = {
 
     const reviewerReviewMatch = pathname.match(REVIEWER_REVIEW_PATH);
     if (reviewerReviewMatch !== null) {
-      if (request.method !== "GET") {
+      if (request.method !== "GET" && request.method !== "DELETE") {
         return jsonResponse(
           {
             error: {
@@ -375,7 +376,7 @@ const worker = {
             },
           },
           405,
-          { allow: "GET" },
+          { allow: "GET, DELETE" },
         );
       }
       const reviewId = reviewerReviewMatch[1];
@@ -387,7 +388,9 @@ const worker = {
       }
       return withReviewerRequestRateLimit(request, env, () =>
         withAuthenticatedReviewer(request, config, (reviewer) =>
-          handleReviewerReviewGet(reviewId, reviewer, config),
+          request.method === "DELETE"
+            ? handleReviewerReviewDelete(reviewId, reviewer, config)
+            : handleReviewerReviewGet(reviewId, reviewer, config),
         ),
       );
     }
