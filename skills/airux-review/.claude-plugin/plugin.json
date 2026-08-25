@@ -1,0 +1,10 @@
+{
+  "name": "airux-review",
+  "version": "0.1.0",
+  "description": "Record localhost web evidence with AirUX and wait for human review.",
+  "author": {
+    "name": "AirUX"
+  },
+  "repository": "https://github.com/DorianGulley/AirUX",
+  "skills": ["./skills/airux-review"]
+}

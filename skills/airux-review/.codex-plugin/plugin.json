@@ -1,0 +1,24 @@
+{
+  "name": "airux-review",
+  "version": "0.1.0",
+  "description": "Record localhost web evidence with AirUX and wait for human review.",
+  "author": {
+    "name": "AirUX",
+    "url": "https://github.com/DorianGulley/AirUX"
+  },
+  "repository": "https://github.com/DorianGulley/AirUX",
+  "keywords": ["airux", "video-evidence", "human-review", "localhost"],
+  "skills": "./skills",
+  "interface": {
+    "displayName": "AirUX Review",
+    "shortDescription": "Record localhost video and await human review.",
+    "longDescription": "Use AirUX to record focused localhost web evidence, submit it for remote human review, wait for the decision, and act on feedback.",
+    "developerName": "AirUX",
+    "category": "Developer Tools",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Record a video of this localhost page and wait for my review.",
+      "Provide AirUX video evidence that this button works."
+    ]
+  }
+}

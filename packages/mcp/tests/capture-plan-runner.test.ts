@@ -1,13 +1,13 @@
 import type { Locator, Page } from "playwright";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  CapturePlanDurationError,
   CapturePlanExecutionError,
   runCapturePlan,
 } from "../src/capture-plan-runner.js";
 
 interface LocatorDouble {
   click: ReturnType<typeof vi.fn>;
+  count: ReturnType<typeof vi.fn>;
   dragTo: ReturnType<typeof vi.fn>;
   fill: ReturnType<typeof vi.fn>;
   hover: ReturnType<typeof vi.fn>;
@@ -22,6 +22,7 @@ function createPageDouble() {
     if (current === undefined) {
       current = {
         click: vi.fn().mockResolvedValue(undefined),
+        count: vi.fn().mockResolvedValue(1),
         dragTo: vi.fn().mockResolvedValue(undefined),
         fill: vi.fn().mockResolvedValue(undefined),
         hover: vi.fn().mockResolvedValue(undefined),
@@ -149,6 +150,51 @@ describe("runCapturePlan", () => {
     expect(error).toMatchObject({
       cause: failure,
       operation: "click",
+      reason: "step_failed",
+      stepIndex: 0,
+    });
+  });
+
+  it("reports a missing selector with its safe step context", async () => {
+    const { page, locator } = createPageDouble();
+    const button = locator("#open-review") as unknown as LocatorDouble;
+    button.click.mockRejectedValueOnce(new Error("private Playwright detail"));
+    button.count.mockResolvedValueOnce(0);
+
+    await expect(runCapturePlan(page, basePlan)).rejects.toMatchObject({
+      matchCount: 0,
+      operation: "click",
+      reason: "selector_not_found",
+      selector: "#open-review",
+      stepIndex: 0,
+    });
+  });
+
+  it("reports a non-unique selector and its match count", async () => {
+    const { page, locator } = createPageDouble();
+    const button = locator("#open-review") as unknown as LocatorDouble;
+    button.click.mockRejectedValueOnce(new Error("strict mode violation"));
+    button.count.mockResolvedValueOnce(3);
+
+    await expect(runCapturePlan(page, basePlan)).rejects.toMatchObject({
+      matchCount: 3,
+      operation: "click",
+      reason: "selector_not_unique",
+      selector: "#open-review",
+      stepIndex: 0,
+    });
+  });
+
+  it("distinguishes a step timeout when its selector is valid", async () => {
+    const { page, locator } = createPageDouble();
+    const timeout = new Error("private timeout detail");
+    timeout.name = "TimeoutError";
+    const button = locator("#open-review") as unknown as LocatorDouble;
+    button.click.mockRejectedValueOnce(timeout);
+
+    await expect(runCapturePlan(page, basePlan)).rejects.toMatchObject({
+      operation: "click",
+      reason: "step_timeout",
       stepIndex: 0,
     });
   });
@@ -161,6 +207,7 @@ describe("runCapturePlan", () => {
     await expect(runCapturePlan(page, basePlan)).rejects.toMatchObject({
       cause: failure,
       operation: "start_url",
+      reason: "navigation_failed",
       stepIndex: null,
     });
   });
@@ -177,6 +224,10 @@ describe("runCapturePlan", () => {
 
     await vi.advanceTimersByTimeAsync(50);
 
-    expect(await result).toBeInstanceOf(CapturePlanDurationError);
+    expect(await result).toMatchObject({
+      name: "CapturePlanDurationError",
+      operation: "pause",
+      stepIndex: 0,
+    });
   });
 });

@@ -157,6 +157,52 @@ export const capturePlanSchema = z
   })
   .strict();
 
+export const captureFailureActionSchema = z.enum([
+  "start_url",
+  "goto",
+  "click",
+  "fill",
+  "press",
+  "hover",
+  "drag",
+  "scroll",
+  "wait_for",
+  "pause",
+]);
+
+export const captureFailureReasonSchema = z.enum([
+  "invalid_input",
+  "navigation_failed",
+  "selector_not_found",
+  "selector_not_unique",
+  "step_timeout",
+  "duration_exceeded",
+  "step_failed",
+  "capture_unavailable",
+]);
+
+export const captureFailureSchema = z
+  .object({
+    code: z.literal("capture_failed"),
+    reason: captureFailureReasonSchema,
+    action: captureFailureActionSchema.optional(),
+    step_index: z.number().int().nonnegative().optional(),
+    selector: selectorSchema.optional(),
+    match_count: z.number().int().nonnegative().optional(),
+    suggestion: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
+export const createReviewCaptureFailureOutputSchema = z
+  .object({ error: captureFailureSchema })
+  .strict();
+
 export type Viewport = z.infer<typeof viewportSchema>;
 export type CaptureStep = z.infer<typeof captureStepSchema>;
 export type CapturePlan = z.infer<typeof capturePlanSchema>;
+export type CaptureFailureAction = z.infer<typeof captureFailureActionSchema>;
+export type CaptureFailureReason = z.infer<typeof captureFailureReasonSchema>;
+export type CaptureFailure = z.infer<typeof captureFailureSchema>;
+export type CreateReviewCaptureFailureOutput = z.infer<
+  typeof createReviewCaptureFailureOutputSchema
+>;

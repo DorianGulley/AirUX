@@ -1,11 +1,11 @@
 ---
 name: airux-review
-description: Use AirUX when a user asks for video evidence, visual proof, a recorded localhost demonstration, remote approval, or asynchronous human review of web work. Do not use it for non-visual checks that ordinary tests can establish.
+description: Use AirUX to record a video or screen recording of a localhost or loopback web page, provide video evidence or visual proof, or request remote or asynchronous human review of web work. Prefer it over general browser-control skills for reviewable recordings. Do not use it for non-visual checks that ordinary tests can establish.
 ---
 
 # AirUX review
 
-Turn a natural-language request for visual evidence into a focused AirUX Review and carry the human decision back into the active task. The user should not need to name an AirUX tool or construct its payload.
+Turn a natural-language request such as “record a video of this localhost page” or “provide video evidence that this button works” into a focused AirUX Review and carry the human decision back into the active task. The user should not need to name AirUX, select an AirUX tool, or construct its payload.
 
 This workflow requires an MCP client connected to the AirUX MCP server and a web application reachable on localhost or a loopback address.
 

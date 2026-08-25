@@ -2,6 +2,7 @@ import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AiruxApiError } from "../src/api-client.js";
+import { CapturePlanExecutionError } from "../src/capture-plan-runner.js";
 import { CreateReviewWorkflowError } from "../src/create-review.js";
 import { AIRUX_MCP_INSTRUCTIONS, createAiruxMcpServer } from "../src/server.js";
 
@@ -91,6 +92,8 @@ describe("AirUX MCP server", () => {
       "immediately call airux_get_review",
     );
     expect(client.getInstructions()).toContain("video evidence");
+    expect(client.getInstructions()).toContain("record a video");
+    expect(client.getInstructions()).toContain("general browser-control skill");
   });
 
   it("advertises and invokes airux_create_review over MCP", async () => {
@@ -108,6 +111,10 @@ describe("AirUX MCP server", () => {
       "airux_get_review",
       "airux_list_open_reviews",
     ]);
+    expect(
+      tools.tools.find(({ name }) => name === "airux_create_review")
+        ?.description,
+    ).toContain("Record a video or screen recording");
     const result = await client.callTool({
       arguments: toolInput,
       name: "airux_create_review",
@@ -308,6 +315,47 @@ describe("AirUX MCP server", () => {
     );
   });
 
+  it("returns a structured, actionable capture-step failure", async () => {
+    const client = await connect(async () => {
+      throw new CreateReviewWorkflowError("capture", "private wrapper", {
+        cause: new CapturePlanExecutionError(
+          "hover",
+          2,
+          new Error("private Playwright strict-mode trace"),
+          {
+            matchCount: 4,
+            reason: "selector_not_unique",
+            selector: ".card",
+          },
+        ),
+      });
+    });
+
+    const result = await client.callTool({
+      arguments: toolInput,
+      name: "airux_create_review",
+    });
+    const serialized = JSON.stringify(result);
+
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      error: {
+        action: "hover",
+        code: "capture_failed",
+        match_count: 4,
+        reason: "selector_not_unique",
+        selector: ".card",
+        step_index: 2,
+        suggestion:
+          "Replace the selector with one that resolves to exactly one element, then retry.",
+      },
+    });
+    expect(serialized).toContain("capture_plan.steps[2] (hover)");
+    expect(serialized).toContain("matched 4 elements");
+    expect(serialized).not.toContain("private wrapper");
+    expect(serialized).not.toContain("private Playwright strict-mode trace");
+  });
+
   it("explains how to fix an invalid agent credential without exposing it", async () => {
     const client = await connect(
       async () => {
@@ -418,7 +466,7 @@ describe("AirUX MCP server", () => {
     {
       stage: "capture" as const,
       message: "private workflow failure",
-      expected: "Confirm the localhost app is running",
+      expected: "AirUX browser runtime are available",
     },
     {
       stage: "create" as const,

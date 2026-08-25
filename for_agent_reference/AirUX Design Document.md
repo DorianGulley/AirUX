@@ -460,6 +460,13 @@ Technical requirements:
   instructions so the same workflow can be discovered by Codex and Claude Code.
   Host-specific metadata or discovery adapters may accompany it without
   duplicating the workflow source.
+- A dual-host customer plugin directory carries Codex and Claude manifests
+  around one nested canonical `SKILL.md`, declares the separately configured
+  AirUX MCP server as a dependency where the host supports dependency metadata,
+  and never packages an agent credential.
+- Natural-language discovery metadata front-loads requests to record a video or
+  screen recording of a localhost page and directs agents to prefer AirUX over
+  generic browser control when the requested output is reviewable video.
 - The skill instructs the agent to call `airux_get_review` immediately after
   `airux_create_review` returns `pending`, remain active while that call polls,
   and interpret the terminal result before completing the task.
@@ -473,6 +480,11 @@ Technical requirements:
 - MCP initialization instructions and individual tool results reinforce the
   same cross-tool sequence for clients that support server guidance or do not
   activate the packaged skill.
+- Capture failures return redacted, structured remediation data. The error
+  identifies a stable failure reason and suggestion, and includes the action,
+  zero-based capture step index, safe selector, and match count when available;
+  raw browser traces, input values, credentials, and provider responses are not
+  exposed.
 - Skills and MCP polling coordinate an active agent task; waking a task that has
   already terminated requires a host notification or callback integration and
   remains outside the MVP.
@@ -677,7 +689,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M7-2 | Observability | Add privacy-safe error reporting, operational metrics, cleanup monitoring, and alerts. | Not Started | M1-4, M4-4, M6-5 |
 | M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Not Started | M1-4, M1-5, M1-7 |
 | M7-4 | End-to-end coverage | Test authentication, upload failures, decisions, resumption, expiry, and deletion. | Not Started | M5-6, M6-6, M7-1 |
-| M7-5 | User onboarding | Package and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | Not Started | M4-6, M6-2, M6-7 |
+| M7-5 | User onboarding | Publish the packaged plugin and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | Not Started | M4-6, M6-2, M6-7 |
 | M7-6 | MVP release validation | Run the production workflow end to end and confirm retention and privacy behavior. | Not Started | M7-2, M7-3, M7-4, M7-5 |
 
 ---

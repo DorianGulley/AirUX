@@ -1,0 +1,10 @@
+interface:
+  display_name: "AirUX Review"
+  short_description: "Record localhost video and await human review"
+  default_prompt: "Use $airux-review to record focused localhost video evidence for this web interaction and act on the review result."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "airux"
+      description: "AirUX MCP server exposing the review lifecycle tools"
