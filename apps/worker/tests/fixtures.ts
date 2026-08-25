@@ -14,4 +14,7 @@ export const TEST_ENV = {
   CREDENTIAL_CREATE_RATE_LIMITER: {
     limit: async () => ({ success: true }),
   },
+  AGENT_REVIEW_CREATE_RATE_LIMITER: {
+    limit: async () => ({ success: true }),
+  },
 } satisfies Env;

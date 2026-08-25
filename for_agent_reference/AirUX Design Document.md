@@ -686,7 +686,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 
 | ID | Subtask | Short description | Status | Prerequisites |
 |---|---|---|---|---|
-| M7-1 | Security controls | Add rate limits, secure headers, request limits, webhook verification, and log redaction. | Not Started | M2-5, M4-4, M5-5 |
+| M7-1 | Security controls | Add rate limits, secure headers, request limits, webhook verification, and log redaction. | Completed | M2-5, M4-4, M5-5 |
 | M7-2 | Observability | Add privacy-safe error reporting, operational metrics, cleanup monitoring, and alerts. | Not Started | M1-4, M4-4, M6-5 |
 | M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Not Started | M1-4, M1-5, M1-7 |
 | M7-4 | End-to-end coverage | Test authentication, upload failures, decisions, resumption, expiry, and deletion. | Not Started | M5-6, M6-6, M7-1 |

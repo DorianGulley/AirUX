@@ -237,8 +237,18 @@ const worker = {
         );
       }
 
-      return withAuthenticatedAgent(request, config, (agent) =>
-        handleAgentReviewCollection(request, agent, config, {
+      return withAuthenticatedAgent(request, config, async (agent) => {
+        if (request.method === "POST") {
+          const response = await enforceRateLimit(
+            env.AGENT_REVIEW_CREATE_RATE_LIMITER,
+            `agent-credential:${agent.credentialId}`,
+          );
+          if (response !== null) {
+            return response;
+          }
+        }
+
+        return handleAgentReviewCollection(request, agent, config, {
           stream: {
             createDirectUpload: (params) =>
               env.STREAM.createDirectUpload(params),
@@ -250,8 +260,8 @@ const worker = {
                 waitUntil: (promise: Promise<unknown>) =>
                   context.waitUntil(promise),
               }),
-        }),
-      );
+        });
+      });
     }
 
     const cancelReviewMatch = pathname.match(AGENT_REVIEW_CANCEL_PATH);

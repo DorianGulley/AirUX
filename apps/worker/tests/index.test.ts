@@ -1,10 +1,14 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { hashAgentCredentialToken } from "../src/agent-credential-token.js";
 import worker from "../src/index.js";
 import { TEST_ENV } from "./fixtures.js";
 
 const CREDENTIAL_ID = "dc0fb4f8-652b-4e12-8899-e12c34afbcde";
 const REVIEWER_ID = "fa2a3aca-e4c6-40fe-bb92-e422f3350806";
+const AGENT_TOKEN = `airux_agent_v1.${CREDENTIAL_ID}.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA`;
 
 function authenticatedReviewerResponse() {
   return Response.json({
@@ -16,6 +20,7 @@ function authenticatedReviewerResponse() {
 describe("AirUX Worker", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    Reflect.deleteProperty(crypto.subtle, "timingSafeEqual");
   });
 
   it("reports health without allowing the response to be cached", async () => {
@@ -274,6 +279,53 @@ describe("AirUX Worker", () => {
       expect(response.status).toBe(401);
     }
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rate limits Review creation by authenticated agent credential", async () => {
+    Object.defineProperty(crypto.subtle, "timingSafeEqual", {
+      configurable: true,
+      value: (left: ArrayBufferView, right: ArrayBufferView) =>
+        timingSafeEqual(
+          Buffer.from(left.buffer, left.byteOffset, left.byteLength),
+          Buffer.from(right.buffer, right.byteOffset, right.byteLength),
+        ),
+    });
+    const secretHash = await hashAgentCredentialToken(AGENT_TOKEN);
+    const fetcher = vi.fn(async () =>
+      Response.json([
+        {
+          id: CREDENTIAL_ID,
+          user_id: REVIEWER_ID,
+          secret_hash: secretHash,
+        },
+      ]),
+    );
+    const limiter = {
+      limit: vi.fn(async () => ({ success: false })),
+    };
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await worker.fetch(
+      new Request("https://airux.app/api/v1/agent/reviews", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${AGENT_TOKEN}`,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      }),
+      { ...TEST_ENV, AGENT_REVIEW_CREATE_RATE_LIMITER: limiter },
+    );
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(limiter.limit).toHaveBeenCalledExactlyOnceWith({
+      key: `agent-credential:${CREDENTIAL_ID}`,
+    });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "rate_limited", message: "Too many requests" },
+    });
   });
 
   it("advertises agent Review methods before authentication", () => {
