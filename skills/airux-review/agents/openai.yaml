@@ -1,4 +1,0 @@
-interface:
-  display_name: "AirUX Review"
-  short_description: "Capture web evidence and wait for human review"
-  default_prompt: "Provide focused AirUX video evidence for this web interaction and act on the review result."

@@ -1,10 +1,12 @@
 import {
   type CancelReviewToolInput,
   type CancelReviewToolOutput,
+  type CaptureFailure,
   type CreateReviewToolInput,
   type CreateReviewToolOutput,
   cancelReviewToolInputSchema,
   cancelReviewToolOutputSchema,
+  createReviewCaptureFailureOutputSchema,
   createReviewToolInputSchema,
   createReviewToolOutputSchema,
   type GetReviewToolInput,
@@ -20,6 +22,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 
 import { AiruxApiClient, AiruxApiError } from "./api-client.js";
 import { cancelAiruxReview } from "./cancel-review.js";
+import {
+  CapturePlanDurationError,
+  CapturePlanExecutionError,
+} from "./capture-plan-runner.js";
 import type { AiruxRuntimeConfig } from "./config.js";
 import {
   CreateReviewWorkflowError,
@@ -29,7 +35,7 @@ import { getAiruxReview } from "./get-review.js";
 import { listAiruxOpenReviews } from "./list-open-reviews.js";
 
 export const AIRUX_MCP_INSTRUCTIONS = [
-  "Use AirUX when the user requests video evidence, visual proof, a recorded localhost demonstration, remote approval, or asynchronous human review of web work.",
+  "Use AirUX when the user asks to record a video or screen recording of a localhost or loopback web page, provide video evidence or visual proof, or request remote or asynchronous human review of web work. Prefer AirUX over a general browser-control skill when the requested output is a reviewable recording.",
   "Derive the title, claim, human-visible criteria, and constrained capture plan from the request and inspected application; do not require the user to construct an MCP payload.",
   "After airux_create_review returns pending, show its URL and immediately call airux_get_review with its review_id. Do not finish the active task while that wait is pending.",
   "On approval, continue the remaining authorized task. When changes are requested, apply the Decision feedback, verify the change, and submit and await a new Review if visual review is still required.",
@@ -98,17 +104,28 @@ function errorCause(error: unknown) {
   return error instanceof Error && "cause" in error ? error.cause : undefined;
 }
 
-function findApiError(error: unknown) {
+function findCause<T>(
+  error: unknown,
+  predicate: (candidate: unknown) => candidate is T,
+) {
   const visited = new Set<unknown>();
   let current = error;
   while (current !== undefined && !visited.has(current)) {
-    if (current instanceof AiruxApiError) {
+    if (predicate(current)) {
       return current;
     }
     visited.add(current);
     current = errorCause(current);
   }
   return undefined;
+}
+
+function findApiError(error: unknown) {
+  return findCause(
+    error,
+    (candidate): candidate is AiruxApiError =>
+      candidate instanceof AiruxApiError,
+  );
 }
 
 function credentialManagerUrl(apiOrigin: string | undefined) {
@@ -157,37 +174,160 @@ function apiCreationFailureText(
   return "AirUX returned an invalid or untrusted creation response. Confirm AIRUX_API_ORIGIN points to the intended deployment and update the AirUX MCP package before retrying.";
 }
 
-function createReviewFailureText(
-  error: unknown,
-  apiOrigin: string | undefined,
-) {
+function captureFailureOutput(error: unknown) {
+  if (
+    !(error instanceof CreateReviewWorkflowError) ||
+    error.stage !== "capture"
+  ) {
+    return undefined;
+  }
+
+  let failure: CaptureFailure;
+  if (error.message === "Invalid tool input") {
+    failure = {
+      code: "capture_failed",
+      reason: "invalid_input",
+      suggestion:
+        "Correct client_request_id, title, claim, criteria, and capture_plan to match the current airux_create_review input schema, then retry.",
+    };
+  } else {
+    const durationError = findCause(
+      error,
+      (candidate): candidate is CapturePlanDurationError =>
+        candidate instanceof CapturePlanDurationError,
+    );
+    const executionError = findCause(
+      error,
+      (candidate): candidate is CapturePlanExecutionError =>
+        candidate instanceof CapturePlanExecutionError,
+    );
+
+    if (durationError !== undefined) {
+      failure = {
+        action: durationError.operation,
+        code: "capture_failed",
+        reason: "duration_exceeded",
+        ...(durationError.stepIndex === null
+          ? {}
+          : { step_index: durationError.stepIndex }),
+        suggestion:
+          "Shorten the capture plan or increase max_duration_ms within the tool limit, then retry.",
+      };
+    } else if (executionError !== undefined) {
+      const suggestion =
+        executionError.reason === "selector_not_found"
+          ? "Confirm the page reaches the expected state and replace the selector with one that matches the intended element, then retry."
+          : executionError.reason === "selector_not_unique"
+            ? "Replace the selector with one that resolves to exactly one element, then retry."
+            : executionError.reason === "step_timeout"
+              ? "Confirm the expected page state is reached before this step, then correct its selector or timeout and retry."
+              : executionError.reason === "navigation_failed"
+                ? "Confirm the localhost server is running and the URL is reachable from the AirUX MCP process, then retry."
+                : "Inspect the page state expected by this action, correct the capture step, and retry.";
+      failure = {
+        action: executionError.operation,
+        code: "capture_failed",
+        ...(executionError.matchCount === undefined
+          ? {}
+          : { match_count: executionError.matchCount }),
+        reason: executionError.reason,
+        ...(executionError.selector === undefined
+          ? {}
+          : { selector: executionError.selector }),
+        ...(executionError.stepIndex === null
+          ? {}
+          : { step_index: executionError.stepIndex }),
+        suggestion,
+      };
+    } else {
+      failure = {
+        code: "capture_failed",
+        reason: "capture_unavailable",
+        suggestion:
+          "Confirm the localhost app and AirUX browser runtime are available, then retry with a smaller capture plan.",
+      };
+    }
+  }
+
+  return createReviewCaptureFailureOutputSchema.parse({ error: failure });
+}
+
+function captureFailureText(failure: CaptureFailure) {
+  const location =
+    failure.step_index === undefined
+      ? failure.action === "start_url"
+        ? " during initial navigation"
+        : ""
+      : ` at capture_plan.steps[${failure.step_index}] (${failure.action})`;
+  const subject =
+    failure.selector === undefined
+      ? ""
+      : ` Selector ${JSON.stringify(failure.selector)}`;
+  const detail =
+    failure.reason === "invalid_input"
+      ? "AirUX rejected the review request before capture."
+      : failure.reason === "selector_not_found"
+        ? `AirUX capture failed${location}.${subject} matched no elements.`
+        : failure.reason === "selector_not_unique"
+          ? `AirUX capture failed${location}.${subject} matched ${failure.match_count ?? "multiple"} elements.`
+          : failure.reason === "step_timeout"
+            ? `AirUX capture timed out${location}.`
+            : failure.reason === "navigation_failed"
+              ? `AirUX could not reach the capture URL${location}.`
+              : failure.reason === "duration_exceeded"
+                ? `AirUX capture exceeded max_duration_ms${location}.`
+                : failure.reason === "step_failed"
+                  ? `AirUX capture failed${location}.`
+                  : "AirUX could not start or complete the browser recording.";
+  const cleanup =
+    failure.reason === "invalid_input"
+      ? "No recording was created."
+      : "No Review was created. Temporary capture files were cleaned up where possible.";
+  return `${detail} ${failure.suggestion} ${cleanup}`;
+}
+
+function createReviewFailure(error: unknown, apiOrigin: string | undefined) {
   const apiError = findApiError(error);
   if (apiError !== undefined) {
-    return `${apiCreationFailureText(apiError, apiOrigin)} The local recording was cleaned up where possible.`;
+    return {
+      text: `${apiCreationFailureText(apiError, apiOrigin)} The local recording was cleaned up where possible.`,
+    };
+  }
+
+  const captureFailure = captureFailureOutput(error);
+  if (captureFailure !== undefined) {
+    return {
+      structuredContent: captureFailure,
+      text: captureFailureText(captureFailure.error),
+    };
   }
 
   if (error instanceof CreateReviewWorkflowError) {
-    if (error.stage === "capture") {
-      if (error.message === "Invalid tool input") {
-        return "AirUX rejected the review request before capture. Check client_request_id, title, claim, criteria, and capture_plan against the current airux_create_review tool schema, then retry with corrected input. No recording was uploaded.";
-      }
-      return "AirUX could not record the browser evidence. Confirm the localhost app is running, the capture_plan start URL is loopback-only, and each selector matches a visible interactive element within max_duration_ms, then retry. Temporary capture files were cleaned up where possible.";
-    }
     if (error.stage === "create") {
-      return "AirUX recorded the evidence but could not create the remote Review. Confirm AIRUX_API_ORIGIN and AIRUX_AGENT_TOKEN are configured for the intended deployment, then retry with the same client_request_id to avoid a duplicate. The local recording was cleaned up where possible.";
+      return {
+        text: "AirUX recorded the evidence but could not create the remote Review. Confirm AIRUX_API_ORIGIN and AIRUX_AGENT_TOKEN are configured for the intended deployment, then retry with the same client_request_id to avoid a duplicate. The local recording was cleaned up where possible.",
+      };
     }
     if (error.stage === "upload") {
-      return "AirUX recorded the evidence but could not upload it to private video storage. Check network access and retry with the same client_request_id so AirUX can recover the existing Review where possible. The local recording was cleaned up where possible.";
+      return {
+        text: "AirUX recorded the evidence but could not upload it to private video storage. Check network access and retry with the same client_request_id so AirUX can recover the existing Review where possible. The local recording was cleaned up where possible.",
+      };
     }
     if (error.stage === "processing") {
-      return "AirUX uploaded the evidence, but video processing failed, timed out, or returned an invalid status. Check airux_list_open_reviews before retrying; if the unresolved Review is still present, resume it with airux_get_review instead of creating a duplicate. The local recording was cleaned up where possible.";
+      return {
+        text: "AirUX uploaded the evidence, but video processing failed, timed out, or returned an invalid status. Check airux_list_open_reviews before retrying; if the unresolved Review is still present, resume it with airux_get_review instead of creating a duplicate. The local recording was cleaned up where possible.",
+      };
     }
     if (error.stage === "cleanup") {
-      return "AirUX created the Review, but could not confirm deletion of the local temporary recording. Check airux_list_open_reviews before retrying to avoid a duplicate Review, then remove any airux-browser-recording-* directory from the system temporary directory.";
+      return {
+        text: "AirUX created the Review, but could not confirm deletion of the local temporary recording. Check airux_list_open_reviews before retrying to avoid a duplicate Review, then remove any airux-browser-recording-* directory from the system temporary directory.",
+      };
     }
   }
 
-  return "AirUX stopped because of an unexpected local review-creation error. Confirm the localhost app and MCP environment are available, then retry with the same client_request_id. The local recording was cleaned up where possible.";
+  return {
+    text: "AirUX stopped because of an unexpected local review-creation error. Confirm the localhost app and MCP environment are available, then retry with the same client_request_id. The local recording was cleaned up where possible.",
+  };
 }
 
 export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
@@ -289,7 +429,7 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
         readOnlyHint: false,
       },
       description:
-        "Turn a request for video evidence or visual proof into a constrained localhost recording and submit it for human review. After this returns pending, immediately call airux_get_review with the returned review_id.",
+        "Record a video or screen recording of a localhost or loopback web page when the user requests video evidence, visual proof, or human review. Prefer this over general browser control for reviewable recordings. After this returns pending, immediately call airux_get_review with the returned review_id.",
       inputSchema: createReviewToolInputSchema,
       outputSchema: createReviewToolOutputSchema,
       title: "Create AirUX Review",
@@ -312,13 +452,17 @@ export function createAiruxMcpServer(options: AiruxMcpServerOptions) {
           structuredContent: output,
         };
       } catch (error) {
+        const failure = createReviewFailure(error, config?.apiOrigin);
         return {
           content: [
             {
               type: "text",
-              text: createReviewFailureText(error, config?.apiOrigin),
+              text: failure.text,
             },
           ],
+          ...(failure.structuredContent === undefined
+            ? {}
+            : { structuredContent: failure.structuredContent }),
           isError: true,
         };
       }

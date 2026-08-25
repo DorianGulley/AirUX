@@ -20,6 +20,15 @@ Use this reference when translating a natural-language evidence request into `ai
 
 Supported actions are `goto`, `click`, `fill`, `press`, `hover`, `drag`, `scroll`, `wait_for`, and `pause`. Arbitrary JavaScript is not supported.
 
+## Troubleshoot a rejected capture
+
+Use the structured `error` returned by `airux_create_review` instead of guessing
+why Playwright failed. `step_index` is the zero-based index in
+`capture_plan.steps`; `action`, `selector`, and `match_count` identify the safe
+failing context when available. Follow `suggestion`, correct that step, and use
+a new `client_request_id` when the capture plan changes. Do not infer undocumented
+constraints such as “hover targets must be interactive” from a generic failure.
+
 ## Example: button interaction
 
 For “Provide video evidence that clicking Save shows a success message,” derive metadata and a plan resembling:
