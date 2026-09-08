@@ -98,10 +98,11 @@ The workflow writes the four Worker runtime secrets to a permission-restricted
 temporary runner file, uploads them with the Worker deployment, and deletes the
 file even when deployment fails. They are never committed or printed.
 
-If the Supabase GitHub integration is connected, turn off its
-**Deploy to production** option. It may remain connected for useful pull
-request checks, but it must not push production migrations in parallel with
-this workflow.
+After this pull request merges, disconnect the legacy Supabase GitHub
+integration; local CI and this workflow replace it for the one-environment MVP.
+If it must remain connected temporarily, turn off **Deploy to production** and
+preview branching so it cannot create a second migration writer or hosted
+development resources.
 
 ## 5. Run and verify the first release
 

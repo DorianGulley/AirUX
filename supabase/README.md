@@ -45,4 +45,5 @@ secrets. Do not include seed data when pushing to production.
 Production migrations are applied only by the manual GitHub deployment
 workflow after the local migration suite and a remote dry-run pass. Do not run
 `supabase db push` against production from a developer machine and do not enable
-a second migration deployer in the Supabase GitHub integration.
+a second migration deployer in the Supabase GitHub integration. The legacy
+integration should be disconnected after the M7-3 pull request merges.
