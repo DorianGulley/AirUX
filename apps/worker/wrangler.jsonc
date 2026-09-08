@@ -1,7 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "airux-local",
-  "account_id": "55806353e3c6044f3d7debc52135688e",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-08",
   "compatibility_flags": ["nodejs_compat"],
@@ -20,8 +19,7 @@
     ]
   },
   "stream": {
-    "binding": "STREAM",
-    "remote": true
+    "binding": "STREAM"
   },
   "assets": {
     "directory": "../web/public",
@@ -49,8 +47,8 @@
     }
   ],
   "env": {
-    "development": {
-      "name": "airux-dev",
+    "production": {
+      "name": "airux-prod",
       "observability": {
         "enabled": true,
         "logs": {
@@ -67,10 +65,13 @@
         "crons": ["*/15 * * * *"]
       },
       "vars": {
-        "AIRUX_ENVIRONMENT": "development",
-        "AIRUX_APP_ORIGIN": "https://airux-dev.airux-platform.workers.dev",
-        "SUPABASE_URL": "https://rulojrgnyibmjgsgqlys.supabase.co",
-        "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_h4BUC3IlHEvCwwxvBmEG3Q_UwQtQTeG"
+        // Deployment scripts replace every value below from the protected
+        // GitHub production environment. The invalid Supabase defaults keep a
+        // direct Wrangler deployment isolated from any hosted database.
+        "AIRUX_ENVIRONMENT": "production",
+        "AIRUX_APP_ORIGIN": "https://airux-prod.airux-platform.workers.dev",
+        "SUPABASE_URL": "https://configuration.invalid",
+        "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_configuration_required"
       },
       "secrets": {
         "required": [

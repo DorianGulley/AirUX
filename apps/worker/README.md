@@ -1,16 +1,16 @@
 # AirUX Worker configuration
 
 The Worker uses generated `Env` bindings plus runtime validation in
-`src/config.ts`. Non-secret local and development values are declared in
-`wrangler.jsonc`; encrypted values never belong in source control.
+`src/config.ts`. Local values are declared in `wrangler.jsonc`; production
+values come from the GitHub `production` environment. Encrypted values never
+belong in source control.
 
 ## Local development
 
 1. Start local Supabase with `pnpm db:start`.
 2. Copy `.dev.vars.example` to `.dev.vars`.
-3. Replace the placeholders with a local-only Supabase secret key, the Stream
-   signing-key ID and base64-encoded private JWK, and the signing secret for the
-   active Stream webhook subscription.
+3. Replace the placeholders with local-only values. Never copy production
+   Stream or Supabase secrets into `.dev.vars`.
 4. Start the Worker with `pnpm worker:dev`.
 
 The Worker command builds the browser client before serving assets. Browser
@@ -18,10 +18,12 @@ configuration is loaded from `GET /api/v1/config`; that response contains only
 the public Supabase URL and publishable key and is marked `no-store`.
 
 Wrangler reads `.dev.vars` only for local development. The file is ignored by
-Git. Cloudflare Stream access uses the `STREAM` Worker binding, so no Stream API
-token is exposed to the Worker or stored in local environment files. Private
-playback tokens are self-signed with a dedicated Stream signing key stored as
-Worker secrets.
+Git. The development command forces local-only bindings; Wrangler does not
+simulate the Stream binding, so upload, playback, and video-deletion behavior
+uses injected fakes in automated tests and is unavailable through the local
+Worker. No ordinary development command can access the production Stream
+library. Private production playback tokens are self-signed with a dedicated
+Stream signing key stored as a Worker secret.
 
 Protected reviewer routes use the browser's Supabase access token from the
 `Authorization: Bearer <token>` header. The Worker validates the token with
@@ -134,7 +136,7 @@ exception: it makes Evidence immediately due. Playback credentials use the
 same policy module and expire after 15 minutes. M6-5 owns acting on persisted
 `delete_after` timestamps; M6-4 only calculates and records them.
 
-The development Worker runs scheduled cleanup every 15 minutes. Each Cron
+The production Worker runs scheduled cleanup every 15 minutes. Each Cron
 invocation prepares at most 25 due Evidence rows in Postgres, expiring draft or
 pending Reviews and revoking playback before calling Stream through its Worker
 binding. Successful deletion moves Evidence from `deleting` to `deleted` and
@@ -170,7 +172,7 @@ acknowledged without reopening terminal state or extending retention.
 JSON request bodies and upstream JSON responses are read through explicit byte
 limits, and client errors never include provider response bodies. The Worker
 does not log authorization headers, request bodies, claims, comments, bearer
-credentials, or signed URLs. The development Wrangler environment persists
+credentials, or signed URLs. The production Wrangler environment persists
 application logs at full sampling and traces at five-percent head sampling.
 Automatic invocation logs are disabled so request metadata is not retained.
 Cloudflare's built-in Worker metrics still provide request volume, status,
@@ -179,11 +181,11 @@ metrics service. Application logs remain allowlist-only: only the fixed-schema
 scheduled-cleanup events above are emitted.
 
 Cloudflare permits one Stream webhook subscription per account. Register the
-environment's public endpoint through the Stream API, then store the returned
+production public endpoint through the Stream API, then store the returned
 signing secret as `STREAM_WEBHOOK_SECRET`. Updating the notification URL rotates
 that secret, so update the Worker secret at the same time.
 
-Create one Stream signing key per environment through the Stream API and store
+Create one production Stream signing key through the Stream API and store
 the returned key ID and base64-encoded private JWK as
 `STREAM_SIGNING_KEY_ID` and `STREAM_SIGNING_JWK`. The private JWK is returned
 only when the key is created and must never be committed or logged.
@@ -207,20 +209,15 @@ reuse conflicts, and single-winner version-checked Decisions. Handler and
 database suites continue to test provider failures and transactional invariants
 at their narrower boundaries.
 
-## Managed development
+## Production deployment
 
-The `development` Wrangler environment explicitly deploys the existing
-`airux-dev` Worker. Configure its encrypted values interactively:
+The `production` Wrangler environment deploys `airux-prod`. Production
+configuration and encrypted runtime values are supplied by the protected
+GitHub environment and are uploaded together with each deliberate manual
+release. `pnpm worker:deploy` always selects this named environment and rejects
+missing production variables.
 
-```sh
-pnpm --filter @airux/worker exec wrangler secret put SUPABASE_SECRET_KEY --env development
-pnpm --filter @airux/worker exec wrangler secret put STREAM_SIGNING_JWK --env development
-pnpm --filter @airux/worker exec wrangler secret put STREAM_SIGNING_KEY_ID --env development
-pnpm --filter @airux/worker exec wrangler secret put STREAM_WEBHOOK_SECRET --env development
-```
-
-Deployments use `pnpm worker:deploy`, which always selects the named
-`development` environment. Production configuration is deferred to M7-3.
-The development Cron Trigger is managed exclusively by `wrangler.jsonc`; local
+The production Cron Trigger is managed exclusively by `wrangler.jsonc`; local
 scheduled-handler testing remains opt-in through Wrangler's
-`/cdn-cgi/handler/scheduled` route.
+`/cdn-cgi/handler/scheduled` route. See `../../DEPLOYMENT.md` for the complete
+account setup, deployment, and cutover procedure.

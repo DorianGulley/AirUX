@@ -1,5 +1,5 @@
 export const TEST_ENV = {
-  AIRUX_ENVIRONMENT: "development",
+  AIRUX_ENVIRONMENT: "production",
   AIRUX_APP_ORIGIN: "https://airux.example",
   SUPABASE_URL: "https://example.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_public-test-value",

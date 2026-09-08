@@ -6,7 +6,7 @@ import { TEST_ENV } from "./fixtures.js";
 describe("loadConfig", () => {
   it("returns structured configuration for valid bindings", () => {
     expect(loadConfig(TEST_ENV)).toEqual({
-      environment: "development",
+      environment: "production",
       appOrigin: "https://airux.example",
       supabase: {
         url: "https://example.supabase.co",
@@ -34,7 +34,7 @@ describe("loadConfig", () => {
   });
 
   it.each([
-    ["AIRUX_ENVIRONMENT", { AIRUX_ENVIRONMENT: "production" }],
+    ["AIRUX_ENVIRONMENT", { AIRUX_ENVIRONMENT: "development" }],
     ["AIRUX_APP_ORIGIN", { AIRUX_APP_ORIGIN: "http://airux.example" }],
     ["SUPABASE_URL", { SUPABASE_URL: "https://example.supabase.co/rest" }],
     [

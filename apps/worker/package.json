@@ -4,11 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "pnpm --filter @airux/web run build && wrangler deploy --env development --strict",
-    "deploy:dry-run": "pnpm --filter @airux/web run build && wrangler deploy --env development --strict --dry-run",
-    "dev": "pnpm --filter @airux/web run build && wrangler dev --test-scheduled",
+    "deploy": "pnpm run validate:production-env && pnpm --filter @airux/web run build && wrangler deploy --env production --strict --var \"AIRUX_ENVIRONMENT:production\" --var \"AIRUX_APP_ORIGIN:$AIRUX_APP_ORIGIN\" --var \"SUPABASE_URL:$SUPABASE_URL\" --var \"SUPABASE_PUBLISHABLE_KEY:$SUPABASE_PUBLISHABLE_KEY\"",
+    "deploy:dry-run": "pnpm run validate:production-env && pnpm --filter @airux/web run build && wrangler deploy --env production --strict --dry-run --var \"AIRUX_ENVIRONMENT:production\" --var \"AIRUX_APP_ORIGIN:$AIRUX_APP_ORIGIN\" --var \"SUPABASE_URL:$SUPABASE_URL\" --var \"SUPABASE_PUBLISHABLE_KEY:$SUPABASE_PUBLISHABLE_KEY\"",
+    "dev": "pnpm --filter @airux/web run build && wrangler dev --local --test-scheduled",
     "types": "wrangler types worker-configuration.d.ts --strict-vars false",
-    "types:check": "wrangler types worker-configuration.d.ts --strict-vars false --check"
+    "types:check": "wrangler types worker-configuration.d.ts --strict-vars false --check",
+    "validate:production-env": "node scripts/validate-production-environment.mjs"
   },
   "dependencies": {
     "@airux/shared": "workspace:*"
