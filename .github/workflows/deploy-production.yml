@@ -1,0 +1,172 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Require main branch
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Production deployments must run from main."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run repository checks
+        run: pnpm check
+
+      - name: Verify database migrations locally
+        run: |
+          pnpm db:start
+          trap 'pnpm db:stop' EXIT
+          pnpm db:reset
+          pnpm db:test
+          pnpm db:lint
+
+      - name: Dry-run production Worker build
+        env:
+          AIRUX_APP_ORIGIN: https://airux.example
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci-placeholder
+        run: pnpm --filter @airux/worker run deploy:dry-run
+
+  deploy:
+    name: Deploy release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: ${{ vars.AIRUX_APP_ORIGIN }}
+    env:
+      AIRUX_APP_ORIGIN: ${{ vars.AIRUX_APP_ORIGIN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate production variables
+        run: pnpm --filter @airux/worker run validate:production-env
+
+      - name: Validate production credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          STREAM_SIGNING_JWK: ${{ secrets.STREAM_SIGNING_JWK }}
+          STREAM_SIGNING_KEY_ID: ${{ secrets.STREAM_SIGNING_KEY_ID }}
+          STREAM_WEBHOOK_SECRET: ${{ secrets.STREAM_WEBHOOK_SECRET }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          required=(
+            CLOUDFLARE_ACCOUNT_ID
+            CLOUDFLARE_API_TOKEN
+            STREAM_SIGNING_JWK
+            STREAM_SIGNING_KEY_ID
+            STREAM_WEBHOOK_SECRET
+            SUPABASE_ACCESS_TOKEN
+            SUPABASE_DB_PASSWORD
+            SUPABASE_PROJECT_ID
+            SUPABASE_SECRET_KEY
+          )
+          for variable in "${required[@]}"; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing production configuration: $variable"
+              exit 1
+            fi
+          done
+
+      - name: Dry-run production migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          pnpm exec supabase link --project-ref "$SUPABASE_PROJECT_ID"
+          pnpm exec supabase db push --linked --dry-run
+
+      - name: Prepare Worker secrets
+        env:
+          STREAM_SIGNING_JWK: ${{ secrets.STREAM_SIGNING_JWK }}
+          STREAM_SIGNING_KEY_ID: ${{ secrets.STREAM_SIGNING_KEY_ID }}
+          STREAM_WEBHOOK_SECRET: ${{ secrets.STREAM_WEBHOOK_SECRET }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs";
+
+          const names = [
+            "SUPABASE_SECRET_KEY",
+            "STREAM_SIGNING_JWK",
+            "STREAM_SIGNING_KEY_ID",
+            "STREAM_WEBHOOK_SECRET",
+          ];
+          const secrets = Object.fromEntries(
+            names.map((name) => [name, process.env[name]]),
+          );
+          writeFileSync(
+            `${process.env.RUNNER_TEMP}/airux-worker-secrets.json`,
+            JSON.stringify(secrets),
+            { mode: 0o600 },
+          );
+          NODE
+
+      - name: Dry-run production Worker deployment
+        run: pnpm --filter @airux/worker run deploy:dry-run --secrets-file "$RUNNER_TEMP/airux-worker-secrets.json"
+
+      - name: Apply production migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: pnpm exec supabase db push --linked
+
+      - name: Deploy production Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm --filter @airux/worker run deploy --secrets-file "$RUNNER_TEMP/airux-worker-secrets.json"
+
+      - name: Remove temporary Worker secrets
+        if: always()
+        run: rm -f "$RUNNER_TEMP/airux-worker-secrets.json"

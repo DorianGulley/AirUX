@@ -175,13 +175,22 @@ Technical requirements:
 
 ### 6.2 Deployment
 
-The hosted AirUX components should deploy as a small number of managed units with separate production and development resources. The local MCP client and Playwright runner are installed in the developer environment rather than hosted by AirUX.
+The hosted AirUX components deploy as one production managed unit for the MVP.
+Development stays local: the local MCP client and Playwright runner are
+installed in the developer environment, Supabase runs locally, and Stream
+behavior is covered by fakes and fixtures rather than a hosted development
+account.
 
 Technical requirements:
 
 - Package the hosted web assets, API request handler, and scheduled cleanup handler in one Cloudflare Worker project.
 - Serve the web application from `airux.app` and the versioned API from the same origin under `/api/v1`.
-- Use separate Cloudflare Stream and Supabase resources for production and development.
+- Use the existing Cloudflare account, its account-wide Stream library, and one
+  hosted Supabase project only for production.
+- Prevent ordinary local development and automated tests from connecting to the
+  production Stream binding.
+- Deploy production deliberately through a manually dispatched GitHub workflow
+  after repository, database, migration, and Worker dry-run checks pass.
 - Store service credentials and environment-specific configuration in Cloudflare bindings and secrets, never in source control.
 - Maintain versioned Postgres migrations and apply backward-compatible migrations before dependent application deployments.
 - Distribute the MCP client and Playwright runner as a versioned package installed and executed locally.
@@ -612,7 +621,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M1-2 | Development tooling | Configure formatting, linting, type-checking, tests, and local commands. | Completed | M1-1 |
 | M1-3 | Shared contracts | Define versioned schemas for capture plans, Reviews, Evidence, Decisions, states, and API errors. | Completed | M1-1 |
 | M1-4 | Cloudflare skeleton | Deploy static assets, a health-check API route, and an empty scheduled handler. | Completed | M1-1 |
-| M1-5 | Supabase foundation | Create isolated development and production resources and establish versioned migrations. | Completed | M1-1 |
+| M1-5 | Supabase foundation | Establish local Supabase development and versioned migrations; defer the clean hosted production project to the deployment milestone. | Completed | M1-1 |
 | M1-6 | Core database schema | Add the four application tables, relationships, indexes, and constraints. | Completed | M1-3, M1-5 |
 | M1-7 | Configuration | Define typed environment configuration and store secrets outside source control. | Completed | M1-4, M1-5 |
 
@@ -688,7 +697,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 |---|---|---|---|---|
 | M7-1 | Security controls | Add rate limits, secure headers, request limits, webhook verification, and log redaction. | Completed | M2-5, M4-4, M5-5 |
 | M7-2 | Observability | Enable privacy-safe logs and traces, operational metrics, cleanup monitoring, and tests. Alert delivery is deferred until a production destination is selected. | Completed | M1-4, M4-4, M6-5 |
-| M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Not Started | M1-4, M1-5, M1-7 |
+| M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Completed | M1-4, M1-5, M1-7 |
 | M7-4 | End-to-end coverage | Test authentication, upload failures, decisions, resumption, expiry, and deletion. | Not Started | M5-6, M6-6, M7-1 |
 | M7-5 | User onboarding | Publish the packaged plugin and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | Not Started | M4-6, M6-2, M6-7 |
 | M7-6 | MVP release validation | Run the production workflow end to end and confirm retention and privacy behavior. | Not Started | M7-2, M7-3, M7-4, M7-5 |

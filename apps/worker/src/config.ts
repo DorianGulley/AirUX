@@ -1,4 +1,4 @@
-const ENVIRONMENTS = ["local", "development"] as const;
+const ENVIRONMENTS = ["local", "production"] as const;
 
 export type AiruxEnvironment = (typeof ENVIRONMENTS)[number];
 

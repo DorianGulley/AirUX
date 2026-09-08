@@ -1,12 +1,9 @@
-# Supabase development
+# Supabase environments
 
-AirUX currently uses one hosted development project. The production project is
-intentionally deferred until the deployment milestone so it can be created from
-the reviewed migration history without carrying development data or settings.
-
-- Development project: `airux-dev`
-- Project reference: `rulojrgnyibmjgsgqlys`
-- Project URL: `https://rulojrgnyibmjgsgqlys.supabase.co`
+AirUX development uses the local Supabase stack. The only hosted project in the
+MVP architecture is production, created fresh from the reviewed migration
+history so it does not inherit development data or settings. See
+`../DEPLOYMENT.md` for production project and CI configuration.
 
 ## Local workflow
 
@@ -40,24 +37,12 @@ pnpm db:migration:new <migration_name>
 Run `pnpm db:reset` before committing to verify that the database can be rebuilt
 from migrations alone.
 
-## Hosted development project
+## Production migrations
 
-Authenticate and link the repository locally. The generated link state and
-credentials are ignored by Git.
+Never commit access tokens, database passwords, secret keys, or OAuth client
+secrets. Do not include seed data when pushing to production.
 
-```sh
-pnpm exec supabase login
-pnpm exec supabase link --project-ref rulojrgnyibmjgsgqlys
-pnpm exec supabase db push --dry-run
-pnpm exec supabase db push
-```
-
-Never commit access tokens, database passwords, service-role keys, or OAuth
-client secrets. Do not include seed data when pushing to a production project.
-
-The hosted development project needs a separate GitHub OAuth app whose callback
-URL is `https://rulojrgnyibmjgsgqlys.supabase.co/auth/v1/callback`. Configure the
-provider credentials, set the site URL and redirect allow list to the exact
-AirUX Worker URL, and disable the email provider in the Supabase dashboard.
-Enable GitHub before disabling email so the project always has a working sign-in
-method.
+Production migrations are applied only by the manual GitHub deployment
+workflow after the local migration suite and a remote dry-run pass. Do not run
+`supabase db push` against production from a developer machine and do not enable
+a second migration deployer in the Supabase GitHub integration.

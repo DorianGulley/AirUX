@@ -45,6 +45,9 @@ describe("browser security headers", () => {
     expect(contentSecurityPolicy).toContain("script-src 'self'");
     expect(contentSecurityPolicy).toContain("frame-ancestors 'none'");
     expect(contentSecurityPolicy).toContain(
+      "connect-src 'self' http://127.0.0.1:54321 https://*.supabase.co",
+    );
+    expect(contentSecurityPolicy).toContain(
       "frame-src https://*.cloudflarestream.com",
     );
     expect(contentSecurityPolicy).not.toContain("frame-src *");
