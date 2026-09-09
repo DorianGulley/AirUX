@@ -1,5 +1,6 @@
 node_modules/
 apps/web/public/main.js
+packages/mcp/dist/
 .wrangler/
 .dev.vars
 .dev.vars.*

@@ -6,6 +6,21 @@ validated localhost browser flow, creates an AirUX Review, uploads the temporary
 WebM recording directly to Cloudflare Stream, waits for processing, removes the
 local recording, and returns the pending Review URL.
 
+## Customer installation
+
+Install the matching Chromium build once, then run the published package from
+the agent host's MCP configuration:
+
+```sh
+npx -y playwright@1.62.1 install chromium
+npx -y @airux/mcp@0.1.0
+```
+
+The server requires `AIRUX_API_ORIGIN` and `AIRUX_AGENT_TOKEN` in its process
+environment. The complete Codex and Claude Code setup, first Review, and
+credential revocation flow is documented in
+[the AirUX Review onboarding guide](https://github.com/DorianGulley/AirUX/tree/main/skills/airux-review#readme).
+
 ## Developer setup
 
 Install Chromium once:
@@ -55,8 +70,10 @@ skill. Claude Code can load a source checkout for local validation with:
 claude --plugin-dir ./skills/airux-review
 ```
 
-Marketplace publication and the complete customer onboarding flow remain M7
-work.
+Repository marketplace catalogs publish the plugin for Codex and Claude Code.
+The separately configured `@airux/mcp` package supplies its local MCP tools;
+neither the marketplace package nor the MCP npm package contains an agent
+credential.
 
 The skill and result poll coordinate an active agent task. They persist Review
 state across interruption, but cannot wake a task after its agent host has
@@ -113,3 +130,18 @@ means that credential has no unresolved Reviews.
 Cancellation is idempotent: AirUX makes the Review terminal, revokes reviewer
 playback, and schedules its Evidence for deletion. Repeating cancellation
 returns the same cancelled Review without incrementing its version again.
+
+## Publishing `@airux/mcp`
+
+The package is released publicly from this directory. Confirm the version is
+unused and the npm account can publish the `@airux` scope, then run from the
+repository root:
+
+```sh
+pnpm --filter @airux/mcp pack
+pnpm --filter @airux/mcp publish --access public
+```
+
+The `prepack` script creates the bundled executable. The bundle includes AirUX's
+workspace-only shared contracts while keeping Playwright and the MCP SDK as
+normal runtime dependencies.

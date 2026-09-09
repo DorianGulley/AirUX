@@ -1,0 +1,20 @@
+{
+  "name": "airux",
+  "interface": {
+    "displayName": "AirUX"
+  },
+  "plugins": [
+    {
+      "name": "airux-review",
+      "source": {
+        "source": "local",
+        "path": "./skills/airux-review"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
