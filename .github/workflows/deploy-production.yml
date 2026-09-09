@@ -49,6 +49,7 @@ jobs:
           pnpm db:reset
           pnpm db:test
           pnpm db:lint
+          pnpm test:e2e
 
       - name: Dry-run production Worker build
         env:

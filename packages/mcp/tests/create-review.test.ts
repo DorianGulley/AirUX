@@ -193,7 +193,7 @@ describe("createAiruxReview", () => {
     expect(remove).toHaveBeenCalledOnce();
   });
 
-  it("deletes the recording after recovery is exhausted", async () => {
+  it("preserves the recording for retry after upload recovery is exhausted", async () => {
     const { artifact, remove } = recording();
     const api = {
       createReview: vi.fn(async () => assignment),
@@ -217,8 +217,9 @@ describe("createAiruxReview", () => {
       error = caught;
     }
     expect(error).toBeInstanceOf(CreateReviewWorkflowError);
+    expect(error).toMatchObject({ stage: "upload" });
     expect(String(error)).not.toContain("secret provider detail");
     expect(api.getReview).toHaveBeenCalledTimes(2);
-    expect(remove).toHaveBeenCalledOnce();
+    expect(remove).not.toHaveBeenCalled();
   });
 });
