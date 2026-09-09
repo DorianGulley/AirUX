@@ -25,8 +25,13 @@ pnpm db:start
 pnpm db:reset
 pnpm db:test
 pnpm db:lint
+pnpm test:e2e
 pnpm db:stop
 ```
+
+The end-to-end suite uses the real local Auth, PostgREST, and Postgres services
+with in-process Worker and MCP clients. GitHub OAuth and Cloudflare Stream stay
+at deterministic test boundaries, so this command never contacts production.
 
 Create schema changes as timestamped migrations:
 
@@ -35,7 +40,7 @@ pnpm db:migration:new <migration_name>
 ```
 
 Run `pnpm db:reset` before committing to verify that the database can be rebuilt
-from migrations alone.
+from migrations alone. Run `pnpm test:e2e` only while the local stack is up.
 
 ## Production migrations
 

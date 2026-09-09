@@ -173,6 +173,7 @@ export async function createAiruxReview(
   const resume =
     dependencies.resumeProcessing ?? waitForBrowserRecordingProcessing;
   let recording: TemporaryBrowserRecording | undefined;
+  let preserveRecordingForRetry = false;
 
   try {
     recording = await capture(parsed.data.capture_plan);
@@ -211,6 +212,7 @@ export async function createAiruxReview(
       ) {
         throw error;
       }
+      preserveRecordingForRetry = true;
 
       const recoveryValue = await callWithTransientRetry(
         () => dependencies.api.getReview(assignment.review_id, signal),
@@ -240,22 +242,32 @@ export async function createAiruxReview(
 
     return pendingOutput(review);
   } catch (error) {
-    if (recording !== undefined) {
+    const stage =
+      error instanceof CreateReviewWorkflowError
+        ? error.stage
+        : preserveRecordingForRetry
+          ? "upload"
+          : recording === undefined
+            ? "capture"
+            : error instanceof AiruxApiError
+              ? "create"
+              : error instanceof DirectUploadError && error.stage === "cleanup"
+                ? "cleanup"
+                : error instanceof DirectUploadError &&
+                    error.stage === "processing"
+                  ? "processing"
+                  : "upload";
+    if (
+      recording !== undefined &&
+      !preserveRecordingForRetry &&
+      stage !== "upload" &&
+      stage !== "processing"
+    ) {
       await bestEffortDelete(recording);
     }
     if (error instanceof CreateReviewWorkflowError) {
       throw error;
     }
-    const stage =
-      recording === undefined
-        ? "capture"
-        : error instanceof AiruxApiError
-          ? "create"
-          : error instanceof DirectUploadError && error.stage === "cleanup"
-            ? "cleanup"
-            : error instanceof DirectUploadError && error.stage === "processing"
-              ? "processing"
-              : "upload";
     throw new CreateReviewWorkflowError(
       stage,
       "The AirUX review workflow did not complete",
