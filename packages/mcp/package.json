@@ -1,20 +1,48 @@
 {
   "name": "@airux/mcp",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Local MCP server for recording localhost evidence and submitting AirUX reviews.",
   "type": "module",
+  "bin": {
+    "airux-mcp": "dist/stdio.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DorianGulley/AirUX.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/DorianGulley/AirUX/tree/main/packages/mcp",
+  "keywords": [
+    "airux",
+    "mcp",
+    "playwright",
+    "video-evidence"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "build": "esbuild src/stdio.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/stdio.js --external:@modelcontextprotocol/* --external:playwright --banner:js='#!/usr/bin/env node'",
     "browser:install": "playwright install chromium",
+    "prepack": "pnpm run build",
     "start": "tsx src/stdio.ts"
   },
   "dependencies": {
-    "@airux/shared": "workspace:*",
     "@modelcontextprotocol/server": "2.0.0",
     "playwright": "1.62.1"
   },
   "devDependencies": {
+    "@airux/shared": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0",
     "@types/node": "26.2.0",
+    "esbuild": "0.28.2",
     "tsx": "4.23.12"
   }
 }

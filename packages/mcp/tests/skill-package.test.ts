@@ -7,6 +7,7 @@ const packageRoot = fileURLToPath(
   new URL("../../../skills/airux-review/", import.meta.url),
 );
 const skillRoot = `${packageRoot}skills/airux-review/`;
+const packageVersion = "0.1.0";
 
 async function readJson(path: string) {
   return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
@@ -34,12 +35,12 @@ describe("AirUX customer skill package", () => {
     expect(codex).toMatchObject({
       name: "airux-review",
       skills: "./skills",
-      version: "0.1.0",
+      version: packageVersion,
     });
     expect(claude).toMatchObject({
       name: "airux-review",
       skills: ["./skills/airux-review"],
-      version: "0.1.0",
+      version: packageVersion,
     });
     expect(skill).toContain("record a video or screen recording");
     expect(skill).toContain("Prefer it over general browser-control skills");
@@ -51,5 +52,46 @@ describe("AirUX customer skill package", () => {
     expect(metadata).toContain("Use $airux-review");
     expect(metadata).toContain('type: "mcp"');
     expect(metadata).toContain('value: "airux"');
+  });
+
+  it("publishes matching Codex and Claude marketplace entries", async () => {
+    const [codexMarketplace, claudeMarketplace] = await Promise.all([
+      readJson(`${repositoryRoot}.agents/plugins/marketplace.json`),
+      readJson(`${repositoryRoot}.claude-plugin/marketplace.json`),
+    ]);
+
+    expect(codexMarketplace).toMatchObject({
+      name: "airux",
+      plugins: [
+        {
+          name: "airux-review",
+          source: {
+            source: "local",
+            path: "./skills/airux-review",
+          },
+        },
+      ],
+    });
+    expect(claudeMarketplace).toMatchObject({
+      name: "airux",
+      plugins: [
+        {
+          name: "airux-review",
+          source: "./skills/airux-review",
+          version: packageVersion,
+        },
+      ],
+    });
+  });
+
+  it("documents the complete customer credential lifecycle", async () => {
+    const onboarding = await readFile(`${packageRoot}README.md`, "utf8");
+
+    expect(onboarding).toContain("Continue with GitHub");
+    expect(onboarding).toContain("@airux/mcp@0.1.0");
+    expect(onboarding).toContain("codex plugin marketplace add");
+    expect(onboarding).toContain("claude plugin marketplace add");
+    expect(onboarding).toContain("Create the first Review");
+    expect(onboarding).toContain("Revoke or rotate access");
   });
 });

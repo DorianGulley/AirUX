@@ -49,9 +49,6 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@airux/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@modelcontextprotocol/server':
         specifier: 2.0.0
         version: 2.0.0
@@ -59,12 +56,18 @@ importers:
         specifier: 1.62.1
         version: 1.62.1
     devDependencies:
+      '@airux/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@modelcontextprotocol/client':
         specifier: 2.0.0
         version: 2.0.0
       '@types/node':
         specifier: 26.2.0
         version: 26.2.0
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
       tsx:
         specifier: 4.23.12
         version: 4.23.12

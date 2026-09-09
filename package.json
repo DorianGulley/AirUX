@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.16.0",
   "scripts": {
-    "check": "biome check . && pnpm worker:types:check && pnpm typecheck && pnpm test && pnpm web:build",
+    "check": "biome check . && pnpm worker:types:check && pnpm typecheck && pnpm mcp:build && pnpm test && pnpm web:build",
     "db:lint": "supabase db lint --local --level error --fail-on error",
     "db:migration:new": "supabase migration new",
     "db:reset": "supabase db reset --local",
@@ -16,6 +16,7 @@
     "format:check": "biome format .",
     "lint": "biome lint .",
     "mcp:browser:install": "pnpm --filter @airux/mcp run browser:install",
+    "mcp:build": "pnpm --filter @airux/mcp run build",
     "mcp:start": "pnpm --filter @airux/mcp run start",
     "test": "vitest run --passWithNoTests --exclude tests/e2e/**",
     "test:e2e": "vitest run tests/e2e --passWithNoTests",

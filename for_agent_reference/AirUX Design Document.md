@@ -699,7 +699,7 @@ Milestones are integration checkpoints. Individual subtasks may begin before ear
 | M7-2 | Observability | Enable privacy-safe logs and traces, operational metrics, cleanup monitoring, and tests. Alert delivery is deferred until a production destination is selected. | Completed | M1-4, M4-4, M6-5 |
 | M7-3 | Deployment workflow | Automate migrations and Cloudflare deployment with environment isolation. | Completed | M1-4, M1-5, M1-7 |
 | M7-4 | End-to-end coverage | Test authentication, upload failures, decisions, resumption, expiry, and deletion. | Completed | M5-6, M6-6, M7-1 |
-| M7-5 | User onboarding | Publish the packaged plugin and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | Not Started | M4-6, M6-2, M6-7 |
+| M7-5 | User onboarding | Publish the packaged plugin and document sign-in, credential setup, MCP and skill installation, first Review, and revocation for supported agent hosts. | In Progress | M4-6, M6-2, M6-7 |
 | M7-6 | MVP release validation | Run the production workflow end to end and confirm retention and privacy behavior. | Not Started | M7-2, M7-3, M7-4, M7-5 |
 
 ---

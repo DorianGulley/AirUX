@@ -1,0 +1,19 @@
+{
+  "name": "airux",
+  "description": "AirUX plugins for recording localhost evidence and awaiting human review.",
+  "owner": {
+    "name": "AirUX"
+  },
+  "plugins": [
+    {
+      "name": "airux-review",
+      "source": "./skills/airux-review",
+      "description": "Record localhost video evidence with AirUX and wait for human review.",
+      "version": "0.1.0",
+      "author": {
+        "name": "AirUX"
+      },
+      "homepage": "https://github.com/DorianGulley/AirUX/tree/main/skills/airux-review"
+    }
+  ]
+}
