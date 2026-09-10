@@ -2,6 +2,8 @@ export interface ScheduledCleanupMetrics {
   readonly selected: number;
   readonly deleted: number;
   readonly failed: number;
+  readonly credentialsDeleted: number;
+  readonly credentialFailures: number;
 }
 
 export type ScheduledCleanupFailureStage = "configuration" | "execution";

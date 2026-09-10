@@ -94,10 +94,8 @@ function createCredentialListItem(credential: AgentCredential) {
   const metadata = document.createElement("p");
   metadata.className = "credential-meta";
   const state = document.createElement("span");
-  const revoked = credential.revoked_at !== null;
   state.className = "credential-state";
-  state.dataset.revoked = String(revoked);
-  state.textContent = revoked ? "Revoked" : "Active";
+  state.textContent = "Active";
   metadata.append(state);
 
   const created = document.createElement("span");
@@ -112,27 +110,30 @@ function createCredentialListItem(credential: AgentCredential) {
   details.append(metadata);
   item.append(details);
 
-  if (!revoked) {
-    const revokeButton = document.createElement("button");
-    revokeButton.className = "danger-action";
-    revokeButton.type = "button";
-    revokeButton.textContent = "Revoke";
-    revokeButton.setAttribute(
-      "aria-label",
-      `Revoke credential ${credential.name}`,
-    );
-    revokeButton.addEventListener("click", () => {
-      void revokeCredentialFromPage(credential, revokeButton);
-    });
-    item.append(revokeButton);
-  }
+  const revokeButton = document.createElement("button");
+  revokeButton.className = "danger-action";
+  revokeButton.type = "button";
+  revokeButton.textContent = "Revoke";
+  revokeButton.setAttribute(
+    "aria-label",
+    `Revoke credential ${credential.name}`,
+  );
+  revokeButton.addEventListener("click", () => {
+    void revokeCredentialFromPage(credential, revokeButton);
+  });
+  item.append(revokeButton);
 
   return item;
 }
 
 function renderCredentialList(credentials: AgentCredential[]) {
-  credentialList.replaceChildren(...credentials.map(createCredentialListItem));
-  credentialEmpty.hidden = credentials.length !== 0;
+  const activeCredentials = credentials.filter(
+    (credential) => credential.revoked_at === null,
+  );
+  credentialList.replaceChildren(
+    ...activeCredentials.map(createCredentialListItem),
+  );
+  credentialEmpty.hidden = activeCredentials.length !== 0;
 }
 
 async function refreshCredentials() {

@@ -21,7 +21,10 @@ const DATA_RESPONSE_LIMIT = 1024 * 1024;
 const DATA_ERROR_RESPONSE_LIMIT = 16 * 1024;
 const CREDENTIAL_COLUMNS = "id,user_id,name,created_at,last_used_at,revoked_at";
 const CREDENTIAL_QUOTA_ERROR_CODE = "P0001";
-const CREDENTIAL_QUOTA_ERROR_MESSAGE = "active agent credential quota exceeded";
+const ACTIVE_CREDENTIAL_QUOTA_ERROR_MESSAGE =
+  "active agent credential quota exceeded";
+const DAILY_CREDENTIAL_QUOTA_ERROR_MESSAGE =
+  "daily agent credential creation quota exceeded";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -31,7 +34,11 @@ type Fetcher = (
 ) => Promise<Response>;
 
 class CredentialNotFoundError extends Error {}
-class CredentialQuotaExceededError extends Error {}
+class CredentialQuotaExceededError extends Error {
+  constructor(readonly kind: "active" | "daily") {
+    super();
+  }
+}
 class CredentialServiceError extends Error {}
 
 function dataApiUrl(config: AiruxConfig) {
@@ -58,22 +65,35 @@ async function fetchData(url: URL, init: RequestInit, fetcher: Fetcher) {
   }
 }
 
-async function isCredentialQuotaError(response: Response) {
+async function credentialQuotaErrorKind(response: Response) {
   let body: unknown;
   try {
     body = await readJsonResponse(response, DATA_ERROR_RESPONSE_LIMIT);
   } catch {
-    return false;
+    return null;
   }
 
-  return (
+  if (
     typeof body === "object" &&
     body !== null &&
     "code" in body &&
     body.code === CREDENTIAL_QUOTA_ERROR_CODE &&
     "message" in body &&
-    body.message === CREDENTIAL_QUOTA_ERROR_MESSAGE
-  );
+    body.message === ACTIVE_CREDENTIAL_QUOTA_ERROR_MESSAGE
+  ) {
+    return "active" as const;
+  }
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "code" in body &&
+    body.code === CREDENTIAL_QUOTA_ERROR_CODE &&
+    "message" in body &&
+    body.message === DAILY_CREDENTIAL_QUOTA_ERROR_MESSAGE
+  ) {
+    return "daily" as const;
+  }
+  return null;
 }
 
 function normalizeTimestamp(value: unknown) {
@@ -167,8 +187,9 @@ async function createCredential(
     fetcher,
   );
   if (!response.ok) {
-    if (await isCredentialQuotaError(response)) {
-      throw new CredentialQuotaExceededError();
+    const quotaKind = await credentialQuotaErrorKind(response);
+    if (quotaKind !== null) {
+      throw new CredentialQuotaExceededError(quotaKind);
     }
     throw new CredentialServiceError();
   }
@@ -200,6 +221,7 @@ async function listCredentials(
   const url = dataApiUrl(config);
   url.searchParams.set("select", CREDENTIAL_COLUMNS);
   url.searchParams.set("user_id", `eq.${reviewer.id}`);
+  url.searchParams.set("revoked_at", "is.null");
   url.searchParams.set("order", "created_at.desc");
   const response = await fetchData(
     url,
@@ -210,10 +232,12 @@ async function listCredentials(
     throw new CredentialServiceError();
   }
 
+  const credentials = await readCredentialRows(response, reviewer.id);
+  if (credentials.some((credential) => credential.revoked_at !== null)) {
+    throw new CredentialServiceError();
+  }
   return jsonResponse(
-    listAgentCredentialsResponseSchema.parse({
-      credentials: await readCredentialRows(response, reviewer.id),
-    }),
+    listAgentCredentialsResponseSchema.parse({ credentials }),
   );
 }
 
@@ -301,7 +325,10 @@ function errorResponse(error: unknown) {
       {
         error: {
           code: "rate_limited",
-          message: "Active credential limit reached",
+          message:
+            error.kind === "active"
+              ? "Active credential limit reached"
+              : "Daily credential creation limit reached",
         },
       },
       429,

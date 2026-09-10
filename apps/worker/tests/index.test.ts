@@ -418,13 +418,19 @@ describe("AirUX Worker", () => {
     const scheduledTime = Date.parse("2026-08-22T04:30:00.000Z");
     const fetcher = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
-        expect(String(input)).toBe(
-          "https://example.supabase.co/rest/v1/rpc/prepare_due_evidence_cleanup",
-        );
+        const url = new URL(String(input));
         expect(JSON.parse(String(init?.body))).toEqual({
           p_due_before: "2026-08-22T04:30:00.000Z",
-          p_limit: 25,
+          p_limit: url.pathname.endsWith("/rpc/prepare_due_evidence_cleanup")
+            ? 25
+            : 100,
         });
+        if (
+          url.pathname.endsWith("/rpc/delete_stale_revoked_agent_credentials")
+        ) {
+          return Response.json([{ deleted_count: 0 }]);
+        }
+        expect(url.pathname).toBe("/rest/v1/rpc/prepare_due_evidence_cleanup");
         return Response.json([]);
       },
     );
@@ -436,12 +442,14 @@ describe("AirUX Worker", () => {
       TEST_ENV,
     );
 
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(2);
     expect(info).toHaveBeenCalledExactlyOnceWith({
       event: "scheduled_cleanup_completed",
       selected: 0,
       deleted: 0,
       failed: 0,
+      credentialsDeleted: 0,
+      credentialFailures: 0,
     });
   });
 
@@ -463,6 +471,11 @@ describe("AirUX Worker", () => {
               review_status: "expired",
             },
           ]);
+        }
+        if (
+          url.pathname.endsWith("/rpc/delete_stale_revoked_agent_credentials")
+        ) {
+          return Response.json([{ deleted_count: 0 }]);
         }
         const body = JSON.parse(String(init?.body));
         completed.push(body.p_evidence_id);
@@ -522,6 +535,8 @@ describe("AirUX Worker", () => {
       selected: 0,
       deleted: 0,
       failed: 0,
+      credentialsDeleted: 0,
+      credentialFailures: 1,
     });
     expect(error.mock.calls.flat().join(" ")).not.toContain(privateFailure);
   });
@@ -548,6 +563,8 @@ describe("AirUX Worker", () => {
       selected: 0,
       deleted: 0,
       failed: 0,
+      credentialsDeleted: 0,
+      credentialFailures: 0,
     });
     expect(error.mock.calls.flat().join(" ")).not.toContain(
       "private invalid value",

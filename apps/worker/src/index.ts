@@ -433,6 +433,8 @@ const worker = {
         selected: 0,
         deleted: 0,
         failed: 0,
+        credentialsDeleted: 0,
+        credentialFailures: 0,
       });
       throw new Error("Scheduled cleanup configuration unavailable");
     }
@@ -447,13 +449,23 @@ const worker = {
         },
         new Date(controller.scheduledTime),
       );
-      recordScheduledCleanupCompleted({ ...result, failed: 0 });
+      recordScheduledCleanupCompleted({
+        ...result,
+        failed: 0,
+        credentialFailures: 0,
+      });
     } catch (error) {
       recordScheduledCleanupFailed(
         "execution",
         error instanceof ScheduledCleanupError
           ? error.summary
-          : { selected: 0, deleted: 0, failed: 0 },
+          : {
+              selected: 0,
+              deleted: 0,
+              failed: 0,
+              credentialsDeleted: 0,
+              credentialFailures: 0,
+            },
       );
       throw error;
     }

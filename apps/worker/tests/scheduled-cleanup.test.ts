@@ -42,7 +42,7 @@ function completionRow(evidenceId: string, reviewId: string) {
   };
 }
 
-describe("scheduled Evidence cleanup", () => {
+describe("scheduled cleanup", () => {
   it("deletes a bounded due batch and records every successful result", async () => {
     const completed: string[] = [];
     const fetcher = vi.fn(
@@ -73,6 +73,15 @@ describe("scheduled Evidence cleanup", () => {
             completionRow(SECOND_EVIDENCE_ID, SECOND_REVIEW_ID),
           ]);
         }
+        if (
+          url.pathname.endsWith("/rpc/delete_stale_revoked_agent_credentials")
+        ) {
+          expect(body).toEqual({
+            p_due_before: NOW.toISOString(),
+            p_limit: 100,
+          });
+          return Response.json([{ deleted_count: 2 }]);
+        }
         return new Response(null, { status: 404 });
       },
     );
@@ -80,7 +89,11 @@ describe("scheduled Evidence cleanup", () => {
 
     await expect(
       runScheduledCleanup(CONFIG, { fetcher, stream }, NOW),
-    ).resolves.toEqual({ selected: 2, deleted: 2 });
+    ).resolves.toEqual({
+      selected: 2,
+      deleted: 2,
+      credentialsDeleted: 2,
+    });
 
     expect(stream.deleteVideo).toHaveBeenCalledExactlyOnceWith(
       "due-stream-video",
@@ -95,6 +108,11 @@ describe("scheduled Evidence cleanup", () => {
         const url = new URL(String(input));
         if (url.pathname.endsWith("/rpc/prepare_due_evidence_cleanup")) {
           return Response.json(dueRows());
+        }
+        if (
+          url.pathname.endsWith("/rpc/delete_stale_revoked_agent_credentials")
+        ) {
+          return Response.json([{ deleted_count: 1 }]);
         }
         const body = JSON.parse(String(init?.body));
         completed.push(body.p_evidence_id);
@@ -112,26 +130,83 @@ describe("scheduled Evidence cleanup", () => {
     await expect(
       runScheduledCleanup(CONFIG, { fetcher, stream }, NOW),
     ).rejects.toEqual(
-      new ScheduledCleanupError({ selected: 2, deleted: 1, failed: 1 }),
+      new ScheduledCleanupError({
+        selected: 2,
+        deleted: 1,
+        failed: 1,
+        credentialsDeleted: 1,
+        credentialFailures: 0,
+      }),
     );
     expect(completed).toEqual([SECOND_EVIDENCE_ID]);
   });
 
   it("fails closed on malformed database work without touching Stream", async () => {
     const stream = { deleteVideo: vi.fn() };
-    const fetcher = vi.fn(async () =>
-      Response.json([
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (
+        url.pathname.endsWith("/rpc/delete_stale_revoked_agent_credentials")
+      ) {
+        return Response.json([{ deleted_count: 0 }]);
+      }
+      return Response.json([
         {
           ...dueRows()[0],
           review_status: "pending",
         },
-      ]),
-    );
+      ]);
+    });
 
     await expect(
       runScheduledCleanup(CONFIG, { fetcher, stream }, NOW),
-    ).rejects.toEqual(new ScheduledCleanupError());
+    ).rejects.toEqual(
+      new ScheduledCleanupError({
+        selected: 0,
+        deleted: 0,
+        failed: 0,
+        credentialsDeleted: 0,
+        credentialFailures: 0,
+      }),
+    );
     expect(stream.deleteVideo).not.toHaveBeenCalled();
+  });
+
+  it("finishes Evidence cleanup when credential cleanup fails", async () => {
+    const completed: string[] = [];
+    const fetcher = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/rpc/prepare_due_evidence_cleanup")) {
+          return Response.json([dueRows()[1]]);
+        }
+        if (url.pathname.endsWith("/rpc/complete_evidence_cleanup")) {
+          const body = JSON.parse(String(init?.body));
+          completed.push(body.p_evidence_id);
+          return Response.json([
+            completionRow(SECOND_EVIDENCE_ID, SECOND_REVIEW_ID),
+          ]);
+        }
+        return new Response(null, { status: 503 });
+      },
+    );
+
+    await expect(
+      runScheduledCleanup(
+        CONFIG,
+        { fetcher, stream: { deleteVideo: vi.fn() } },
+        NOW,
+      ),
+    ).rejects.toEqual(
+      new ScheduledCleanupError({
+        selected: 1,
+        deleted: 1,
+        failed: 0,
+        credentialsDeleted: 0,
+        credentialFailures: 1,
+      }),
+    );
+    expect(completed).toEqual([SECOND_EVIDENCE_ID]);
   });
 
   it("rejects an invalid cleanup clock before querying Postgres", async () => {

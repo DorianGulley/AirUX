@@ -2,6 +2,7 @@ import { readJsonResponse } from "./bounded-json.js";
 import type { AiruxConfig } from "./config.js";
 
 const CLEANUP_BATCH_LIMIT = 25;
+const CREDENTIAL_CLEANUP_BATCH_LIMIT = 100;
 const DATA_RESPONSE_LIMIT = 64 * 1024;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -31,6 +32,8 @@ export interface ScheduledCleanupSummary {
   readonly selected: number;
   readonly deleted: number;
   readonly failed: number;
+  readonly credentialsDeleted: number;
+  readonly credentialFailures: number;
 }
 
 interface DueEvidence {
@@ -43,7 +46,13 @@ export class ScheduledCleanupError extends Error {
   readonly summary: ScheduledCleanupSummary;
 
   constructor(
-    summary: ScheduledCleanupSummary = { selected: 0, deleted: 0, failed: 0 },
+    summary: ScheduledCleanupSummary = {
+      selected: 0,
+      deleted: 0,
+      failed: 0,
+      credentialsDeleted: 0,
+      credentialFailures: 0,
+    },
   ) {
     super("Scheduled cleanup failed");
     this.name = "ScheduledCleanupError";
@@ -184,20 +193,13 @@ async function recordDeletion(
   }
 }
 
-export async function runScheduledCleanup(
+async function runEvidenceCleanup(
+  dueBefore: string,
   config: AiruxConfig,
   dependencies: ScheduledCleanupDependencies,
-  now = new Date(),
+  fetcher: Fetcher,
 ) {
-  if (Number.isNaN(now.getTime())) {
-    throw new ScheduledCleanupError();
-  }
-  const fetcher = dependencies.fetcher ?? fetch;
-  const evidenceRows = await prepareDueEvidence(
-    now.toISOString(),
-    config,
-    fetcher,
-  );
+  const evidenceRows = await prepareDueEvidence(dueBefore, config, fetcher);
   let deleted = 0;
   let failed = 0;
 
@@ -218,7 +220,102 @@ export async function runScheduledCleanup(
       selected: evidenceRows.length,
       deleted,
       failed,
+      credentialsDeleted: 0,
+      credentialFailures: 0,
     });
   }
   return { selected: evidenceRows.length, deleted };
+}
+
+async function deleteStaleRevokedCredentials(
+  dueBefore: string,
+  config: AiruxConfig,
+  fetcher: Fetcher,
+) {
+  const rows = await callRpc(
+    "delete_stale_revoked_agent_credentials",
+    {
+      p_due_before: dueBefore,
+      p_limit: CREDENTIAL_CLEANUP_BATCH_LIMIT,
+    },
+    config,
+    fetcher,
+  );
+  const row = asRecord(rows[0]);
+  if (
+    rows.length !== 1 ||
+    row === null ||
+    typeof row.deleted_count !== "number" ||
+    !Number.isInteger(row.deleted_count) ||
+    row.deleted_count < 0 ||
+    row.deleted_count > CREDENTIAL_CLEANUP_BATCH_LIMIT
+  ) {
+    throw new ScheduledCleanupError();
+  }
+  return row.deleted_count;
+}
+
+export async function runScheduledCleanup(
+  config: AiruxConfig,
+  dependencies: ScheduledCleanupDependencies,
+  now = new Date(),
+) {
+  if (Number.isNaN(now.getTime())) {
+    throw new ScheduledCleanupError();
+  }
+
+  const fetcher = dependencies.fetcher ?? fetch;
+  const dueBefore = now.toISOString();
+  let summary: ScheduledCleanupSummary = {
+    selected: 0,
+    deleted: 0,
+    failed: 0,
+    credentialsDeleted: 0,
+    credentialFailures: 0,
+  };
+  let cleanupFailed = false;
+
+  try {
+    const evidence = await runEvidenceCleanup(
+      dueBefore,
+      config,
+      dependencies,
+      fetcher,
+    );
+    summary = { ...summary, ...evidence };
+  } catch (error) {
+    cleanupFailed = true;
+    if (error instanceof ScheduledCleanupError) {
+      summary = {
+        ...summary,
+        selected: error.summary.selected,
+        deleted: error.summary.deleted,
+        failed: error.summary.failed,
+      };
+    }
+  }
+
+  try {
+    summary = {
+      ...summary,
+      credentialsDeleted: await deleteStaleRevokedCredentials(
+        dueBefore,
+        config,
+        fetcher,
+      ),
+    };
+  } catch {
+    cleanupFailed = true;
+    summary = { ...summary, credentialFailures: 1 };
+  }
+
+  if (cleanupFailed) {
+    throw new ScheduledCleanupError(summary);
+  }
+
+  return {
+    selected: summary.selected,
+    deleted: summary.deleted,
+    credentialsDeleted: summary.credentialsDeleted,
+  };
 }

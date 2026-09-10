@@ -319,10 +319,6 @@ input:focus-visible {
   font-weight: 750;
 }
 
-.credential-state[data-revoked="true"] {
-  color: #8c2d26;
-}
-
 .session-note {
   margin-top: 2rem;
   color: #657163;

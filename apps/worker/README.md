@@ -36,8 +36,9 @@ Reviewer-facing endpoints are protected by two Cloudflare rate-limit bindings.
 Authentication attempts are limited to 120 requests per minute per source IP,
 and credential creation is additionally limited to 10 requests per minute per
 reviewer. Limiter failures fail closed. The database independently caps each
-reviewer at 20 active credentials; revoking one frees a slot while retaining
-the revoked record for audit history.
+reviewer at 20 active credentials and 50 credential creations in any rolling
+24-hour window. Revoking one frees an active slot without bypassing the daily
+creation limit.
 
 Signed-in reviewers manage agent credentials through:
 
@@ -50,10 +51,11 @@ POST /api/v1/agent-credentials/:id/revoke
 Creation returns the plaintext credential exactly once. The browser keeps it
 only in temporary DOM state, while the Worker stores only its SHA-256 digest.
 List and revoke operations always filter by the validated reviewer ID before
-using the Supabase Data API. Because the Worker secret bypasses RLS, the Worker
-also verifies that every returned credential row has that reviewer ID before
+using the Supabase Data API, and listings include active credentials only.
+Because the Worker secret bypasses RLS, the Worker also verifies that every
+returned credential row has that reviewer ID and expected active state before
 omitting the internal owner field from the public response. Revocation is
-idempotent and retains the database record for audit history.
+idempotent while the record remains within its retention window.
 
 Agent API routes use the same standard header with the versioned agent token:
 
@@ -149,11 +151,18 @@ overlapping Cron invocations return the original deletion result without
 changing `deleted_at`. Other provider and database failures still fail the
 Cron invocation and remain eligible for a later scheduled retry.
 
+The same invocation independently deletes at most 100 credentials that were
+revoked at least 30 days earlier and have never created a Review. Credentials
+referenced by Reviews remain as provenance, and the restrictive database
+foreign key provides a final deletion guard. A failure in either cleanup phase
+does not prevent the other phase from finishing its current batch.
+
 Every scheduled invocation emits one allowlisted JSON event. Successful runs
 emit `scheduled_cleanup_completed`; failed configuration or execution emits
 `scheduled_cleanup_failed`. Events contain only the stage and aggregate
-`selected`, `deleted`, and `failed` counts. They intentionally exclude Review,
-Evidence, Stream, and user identifiers as well as exception and provider text.
+Evidence and credential cleanup counts. They intentionally exclude Review,
+Evidence, Credential, Stream, and user identifiers as well as exception and
+provider text.
 
 Stream sends processing results to:
 
