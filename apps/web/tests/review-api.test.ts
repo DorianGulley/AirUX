@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createReviewPlayback,
   getReviewerReview,
+  listPendingReviewerReviews,
   ReviewApiError,
   submitReviewDecision,
 } from "../src/review-api.js";
@@ -37,6 +38,33 @@ const review = {
 } as const;
 
 describe("browser Review API", () => {
+  it("lists pending Reviews whose Evidence is ready for playback", async () => {
+    const summary = {
+      id: REVIEW_ID,
+      title: review.title,
+      status: "pending",
+      submitted_at: review.submitted_at,
+      expires_at: review.expires_at,
+      evidence: {
+        id: EVIDENCE_ID,
+        kind: "browser_video",
+        status: "ready",
+        duration_ms: 15_000,
+        width: 1_280,
+        height: 720,
+      },
+    } as const;
+    const fetcher = vi.fn(async () => Response.json({ reviews: [summary] }));
+
+    await expect(
+      listPendingReviewerReviews(ACCESS_TOKEN, fetcher),
+    ).resolves.toEqual([summary]);
+    expect(fetcher).toHaveBeenCalledExactlyOnceWith("/api/v1/reviews", {
+      method: "GET",
+      headers: { authorization: `Bearer ${ACCESS_TOKEN}` },
+    });
+  });
+
   it("loads the owned Review with the reviewer session", async () => {
     const fetcher = vi.fn(async () => Response.json({ review }));
 
@@ -201,6 +229,34 @@ describe("browser Review API", () => {
           REVIEW_ID,
           ACCESS_TOKEN,
           vi.fn(async () => new Response("private", { status: 404 })),
+        ),
+    ],
+    [
+      "invalid inbox summary",
+      () =>
+        listPendingReviewerReviews(
+          ACCESS_TOKEN,
+          vi.fn(async () =>
+            Response.json({
+              reviews: [
+                {
+                  id: REVIEW_ID,
+                  title: review.title,
+                  status: "approved",
+                  submitted_at: review.submitted_at,
+                  expires_at: review.expires_at,
+                  evidence: {
+                    id: EVIDENCE_ID,
+                    kind: "browser_video",
+                    status: "ready",
+                    duration_ms: 15_000,
+                    width: 1_280,
+                    height: 720,
+                  },
+                },
+              ],
+            }),
+          ),
         ),
     ],
     [

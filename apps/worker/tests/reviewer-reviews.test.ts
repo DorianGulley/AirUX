@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { loadConfig } from "../src/config.js";
 import {
+  handlePendingReviewerReviewList,
   handleReviewerReviewDecision,
   handleReviewerReviewDelete,
   handleReviewerReviewGet,
@@ -129,6 +130,103 @@ function decisionRequest(body: unknown) {
     },
   );
 }
+
+describe("reviewer Review inbox", () => {
+  it("returns only owned pending Reviews whose Evidence is ready", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/rest/v1/reviews") {
+        expect(url.searchParams.get("user_id")).toBe(`eq.${REVIEWER.id}`);
+        expect(url.searchParams.get("status")).toBe("eq.pending");
+        expect(url.searchParams.get("deleted_at")).toBe("is.null");
+        expect(url.searchParams.get("submitted_at")).toBe("not.is.null");
+        expect(url.searchParams.get("order")).toBe("submitted_at.desc");
+        expect(url.searchParams.get("limit")).toBe("100");
+        return Response.json([reviewRow()]);
+      }
+      if (url.pathname === "/rest/v1/evidence") {
+        expect(url.searchParams.get("review_id")).toBe(`in.(${REVIEW_ID})`);
+        expect(url.searchParams.get("status")).toBe("eq.ready");
+        expect(url.searchParams.get("deleted_at")).toBe("is.null");
+        return Response.json([evidenceRow()]);
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const response = await handlePendingReviewerReviewList(
+      REVIEWER,
+      CONFIG,
+      fetcher,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body).toEqual({
+      reviews: [
+        {
+          id: REVIEW_ID,
+          title: "Review the responsive layout",
+          status: "pending",
+          submitted_at: "2026-08-20T08:01:00.000Z",
+          expires_at: "2026-08-23T08:01:00.000Z",
+          evidence: {
+            id: EVIDENCE_ID,
+            kind: "browser_video",
+            status: "ready",
+            duration_ms: 15_000,
+            width: 1_280,
+            height: 720,
+          },
+        },
+      ],
+    });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(REVIEWER.id);
+    expect(serialized).not.toContain("private-stream-id");
+    expect(serialized).not.toContain("private-agent-request");
+  });
+
+  it("returns an empty inbox without an Evidence query", async () => {
+    const fetcher = vi.fn(async () => Response.json([]));
+    const response = await handlePendingReviewerReviewList(
+      REVIEWER,
+      CONFIG,
+      fetcher,
+    );
+
+    await expect(response.json()).resolves.toEqual({ reviews: [] });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("fails closed for foreign Reviews or missing ready Evidence", async () => {
+    const foreign = await handlePendingReviewerReviewList(
+      REVIEWER,
+      CONFIG,
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        return Response.json(
+          url.pathname.endsWith("/reviews")
+            ? [reviewRow({ user_id: OTHER_REVIEWER_ID })]
+            : [],
+        );
+      }),
+    );
+    expect(foreign.status).toBe(503);
+
+    const missingEvidence = await handlePendingReviewerReviewList(
+      REVIEWER,
+      CONFIG,
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input));
+        return Response.json(
+          url.pathname.endsWith("/reviews") ? [reviewRow()] : [],
+        );
+      }),
+    );
+    expect(missingEvidence.status).toBe(503);
+  });
+});
 
 describe("reviewer Review retrieval", () => {
   it("returns presentation metadata without internal ownership or provider fields", async () => {

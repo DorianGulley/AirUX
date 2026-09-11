@@ -126,6 +126,16 @@ the result, and act on the terminal decision.
 
 ### 4.4 Human Review Experience
 
+The reviewer web application uses one route-based console with **Reviews**,
+**Credentials**, and **Account** tabs. Reviews is the signed-in landing page;
+Credentials contains the agent credential lifecycle; and Account contains the
+reviewer identity and sign-in or sign-out action. Direct Review links retain the
+same console navigation and return the user to that Review after authentication.
+
+The Reviews tab is an inbox of unresolved Reviews whose video Evidence is ready
+for playback. It presents compact metadata and links to the focused Review page
+without issuing playback credentials for every inbox item.
+
 The review page should optimize for one question:
 
 > “Can I confidently approve this work?”
@@ -334,7 +344,10 @@ The decision contract is:
 
 Technical requirements:
 
-- The reviewer browser requests Review data from the API.
+- The reviewer browser lists only owned, nondeleted `pending` Reviews with
+  `ready` Evidence, ordered by submission time with the newest first.
+- The reviewer browser requests Review data from the API after the reviewer
+  selects a Review.
 - After authorization, the API returns a short-lived Stream playback token.
 - The browser plays the private video directly from Cloudflare Stream.
 - The API writes the Decision and Review status transition in one Postgres transaction.
@@ -552,6 +565,7 @@ POST /api/v1/agent/reviews/:id/cancel
 Reviewer endpoints:
 
 ```text
+GET    /api/v1/reviews
 GET    /api/v1/reviews/:id
 POST   /api/v1/reviews/:id/decision
 POST   /api/v1/evidence/:id/playback-token
@@ -578,6 +592,10 @@ Technical requirements:
   lifecycle metadata, Evidence presentation metadata, and terminal Decision
   feedback while excluding owner IDs, credential IDs, Stream video IDs, and
   deletion metadata.
+- Reviewer list responses contain at most 100 compact `pending` Review
+  summaries with ready Evidence presentation metadata. They exclude ownership,
+  credential, Stream video, claim, criteria, and deletion fields and do not
+  include playback credentials.
 - Reviewer decisions are accepted only for an owned, nondeleted `pending`
   Review at the exact `expected_version`. Stale, repeated, and already-terminal
   submissions return a conflict even when the requested outcome is identical.

@@ -4,6 +4,7 @@ import type {
   ReviewerReview,
   ReviewerReviewDecision,
   ReviewerReviewEvidence,
+  ReviewerReviewSummary,
   StreamPlayback,
 } from "@airux/shared/v1";
 import { CONTRACT_LIMITS } from "@airux/shared/v1/limits";
@@ -228,6 +229,59 @@ function parseReview(value: unknown): ReviewerReview | null {
   };
 }
 
+function parseReviewSummary(value: unknown): ReviewerReviewSummary | null {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, [
+      "id",
+      "title",
+      "status",
+      "submitted_at",
+      "expires_at",
+      "evidence",
+    ]) ||
+    typeof value.id !== "string" ||
+    !UUID_PATTERN.test(value.id) ||
+    !isTrimmedText(value.title) ||
+    value.status !== "pending" ||
+    !isUtcTimestamp(value.submitted_at) ||
+    !isUtcTimestamp(value.expires_at) ||
+    !isRecord(value.evidence) ||
+    !hasExactKeys(value.evidence, [
+      "id",
+      "kind",
+      "status",
+      "duration_ms",
+      "width",
+      "height",
+    ]) ||
+    typeof value.evidence.id !== "string" ||
+    !UUID_PATTERN.test(value.evidence.id) ||
+    value.evidence.kind !== "browser_video" ||
+    value.evidence.status !== "ready" ||
+    !isNullablePositiveInteger(value.evidence.duration_ms) ||
+    !isNullablePositiveInteger(value.evidence.width) ||
+    !isNullablePositiveInteger(value.evidence.height)
+  ) {
+    return null;
+  }
+  return {
+    id: value.id,
+    title: value.title,
+    status: value.status,
+    submitted_at: value.submitted_at,
+    expires_at: value.expires_at,
+    evidence: {
+      id: value.evidence.id,
+      kind: value.evidence.kind,
+      status: value.evidence.status,
+      duration_ms: value.evidence.duration_ms,
+      width: value.evidence.width,
+      height: value.evidence.height,
+    },
+  };
+}
+
 function parsePlayback(value: unknown): StreamPlayback | null {
   if (
     !isRecord(value) ||
@@ -322,6 +376,28 @@ export async function getReviewerReview(
     throw new ReviewApiError();
   }
   return review;
+}
+
+export async function listPendingReviewerReviews(
+  accessToken: string,
+  fetcher: Fetcher = fetch,
+) {
+  const response = await fetcher("/api/v1/reviews", {
+    method: "GET",
+    headers: authorizationHeaders(accessToken),
+  });
+  const body: unknown = await readResponse(response);
+  if (!isRecord(body) || !hasExactKeys(body, ["reviews"])) {
+    throw new ReviewApiError();
+  }
+  if (!Array.isArray(body.reviews) || body.reviews.length > 100) {
+    throw new ReviewApiError();
+  }
+  const reviews = body.reviews.map(parseReviewSummary);
+  if (reviews.some((review) => review === null)) {
+    throw new ReviewApiError();
+  }
+  return reviews as ReviewerReviewSummary[];
 }
 
 export async function createReviewPlayback(

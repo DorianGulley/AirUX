@@ -22,6 +22,7 @@ import {
   getReviewToolOutputSchema,
   listOpenReviewsToolInputSchema,
   listOpenReviewsToolOutputSchema,
+  listPendingReviewerReviewsResponseSchema,
   REVIEW_STATES,
   reviewSchema,
   reviewStateSchema,
@@ -333,6 +334,48 @@ describe("airux_cancel_review tool contracts", () => {
             created_at: "2026-08-20T08:02:00Z",
           },
         },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("reviewer Review inbox contracts", () => {
+  const summary = {
+    id: "rvw_1",
+    title: validCreateRequest.title,
+    status: "pending" as const,
+    submitted_at: "2026-08-20T08:01:00Z",
+    expires_at: "2026-08-23T08:01:00Z",
+    evidence: {
+      id: "evd_1",
+      kind: "browser_video" as const,
+      status: "ready" as const,
+      duration_ms: 15_000,
+      width: 1_280,
+      height: 720,
+    },
+  };
+
+  it("accepts compact pending Reviews with playable Evidence", () => {
+    expect(
+      listPendingReviewerReviewsResponseSchema.parse({ reviews: [summary] }),
+    ).toEqual({ reviews: [summary] });
+  });
+
+  it("rejects resolved Reviews and Evidence that is not ready", () => {
+    expect(
+      listPendingReviewerReviewsResponseSchema.safeParse({
+        reviews: [{ ...summary, status: "approved" }],
+      }).success,
+    ).toBe(false);
+    expect(
+      listPendingReviewerReviewsResponseSchema.safeParse({
+        reviews: [
+          {
+            ...summary,
+            evidence: { ...summary.evidence, status: "processing" },
+          },
+        ],
       }).success,
     ).toBe(false);
   });

@@ -4,7 +4,9 @@ import {
   decisionRequestSchema,
   evidenceStateSchema,
   getReviewerReviewResponseSchema,
+  listPendingReviewerReviewsResponseSchema,
   type ReviewerReview,
+  type ReviewerReviewSummary,
   reviewerReviewSchema,
   reviewStateSchema,
 } from "@airux/shared/v1";
@@ -26,6 +28,7 @@ const RPC_ERROR_CODE = "P0001";
 const DECISION_CONFLICT_MESSAGE = "review decision conflict";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const REVIEW_INBOX_LIMIT = 100;
 
 type Fetcher = (
   input: RequestInfo | URL,
@@ -228,6 +231,142 @@ async function getReview(
     throw new ReviewerReviewServiceError();
   }
   return normalized;
+}
+
+function normalizePendingReviewSummary(
+  reviewValue: unknown,
+  evidenceValue: unknown,
+  reviewer: AuthenticatedReviewer,
+): ReviewerReviewSummary | null {
+  const review = asRecord(reviewValue);
+  const evidence = asRecord(evidenceValue);
+  if (
+    review === null ||
+    evidence === null ||
+    review.user_id !== reviewer.id ||
+    evidence.review_id !== review.id
+  ) {
+    return null;
+  }
+
+  const parsed =
+    listPendingReviewerReviewsResponseSchema.shape.reviews.element.safeParse({
+      id: review.id,
+      title: review.title,
+      status: review.status,
+      submitted_at: normalizeTimestamp(review.submitted_at),
+      expires_at: normalizeTimestamp(review.expires_at),
+      evidence: {
+        id: evidence.id,
+        kind: evidence.kind,
+        status: evidence.status,
+        duration_ms: evidence.duration_ms,
+        width: evidence.width,
+        height: evidence.height,
+      },
+    });
+  return parsed.success ? parsed.data : null;
+}
+
+async function listPendingReviews(
+  reviewer: AuthenticatedReviewer,
+  config: AiruxConfig,
+  fetcher: Fetcher,
+) {
+  const reviewUrl = dataApiUrl(config, "reviews");
+  reviewUrl.searchParams.set(
+    "select",
+    "id,user_id,title,status,submitted_at,expires_at",
+  );
+  reviewUrl.searchParams.set("user_id", `eq.${reviewer.id}`);
+  reviewUrl.searchParams.set("status", "eq.pending");
+  reviewUrl.searchParams.set("deleted_at", "is.null");
+  reviewUrl.searchParams.set("submitted_at", "not.is.null");
+  reviewUrl.searchParams.set("order", "submitted_at.desc");
+  reviewUrl.searchParams.set("limit", String(REVIEW_INBOX_LIMIT));
+
+  const reviewResponse = await fetchData(
+    reviewUrl,
+    { method: "GET", headers: dataApiHeaders(config) },
+    fetcher,
+  );
+  if (!reviewResponse.ok) {
+    throw new ReviewerReviewServiceError();
+  }
+  const reviews = await readRows(reviewResponse);
+  if (reviews.length === 0) {
+    return [];
+  }
+
+  const reviewIds: string[] = [];
+  const expectedReviewIds = new Set<string>();
+  for (const value of reviews) {
+    const review = asRecord(value);
+    if (
+      review === null ||
+      review.user_id !== reviewer.id ||
+      typeof review.id !== "string" ||
+      !UUID_PATTERN.test(review.id) ||
+      expectedReviewIds.has(review.id)
+    ) {
+      throw new ReviewerReviewServiceError();
+    }
+    reviewIds.push(review.id);
+    expectedReviewIds.add(review.id);
+  }
+
+  const evidenceUrl = dataApiUrl(config, "evidence");
+  evidenceUrl.searchParams.set(
+    "select",
+    "id,review_id,kind,status,duration_ms,width,height",
+  );
+  evidenceUrl.searchParams.set("review_id", `in.(${reviewIds.join(",")})`);
+  evidenceUrl.searchParams.set("status", "eq.ready");
+  evidenceUrl.searchParams.set("deleted_at", "is.null");
+  const evidenceResponse = await fetchData(
+    evidenceUrl,
+    { method: "GET", headers: dataApiHeaders(config) },
+    fetcher,
+  );
+  if (!evidenceResponse.ok) {
+    throw new ReviewerReviewServiceError();
+  }
+  const evidenceRows = await readRows(evidenceResponse);
+  const evidenceByReview = new Map<string, unknown>();
+  for (const value of evidenceRows) {
+    const evidence = asRecord(value);
+    if (
+      evidence === null ||
+      typeof evidence.review_id !== "string" ||
+      !expectedReviewIds.has(evidence.review_id) ||
+      evidenceByReview.has(evidence.review_id)
+    ) {
+      throw new ReviewerReviewServiceError();
+    }
+    evidenceByReview.set(evidence.review_id, value);
+  }
+
+  const summaries: ReviewerReviewSummary[] = [];
+  for (const reviewValue of reviews) {
+    const review = asRecord(reviewValue);
+    const evidence =
+      typeof review?.id === "string"
+        ? evidenceByReview.get(review.id)
+        : undefined;
+    if (evidence === undefined) {
+      throw new ReviewerReviewServiceError();
+    }
+    const summary = normalizePendingReviewSummary(
+      reviewValue,
+      evidence,
+      reviewer,
+    );
+    if (summary === null) {
+      throw new ReviewerReviewServiceError();
+    }
+    summaries.push(summary);
+  }
+  return summaries;
 }
 
 function normalizeDecisionResult(
@@ -452,6 +591,22 @@ export async function handleReviewerReviewGet(
     return jsonResponse(
       getReviewerReviewResponseSchema.parse({
         review: await getReview(reviewId, reviewer, config, fetcher),
+      }),
+    );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function handlePendingReviewerReviewList(
+  reviewer: AuthenticatedReviewer,
+  config: AiruxConfig,
+  fetcher: Fetcher = fetch,
+) {
+  try {
+    return jsonResponse(
+      listPendingReviewerReviewsResponseSchema.parse({
+        reviews: await listPendingReviews(reviewer, config, fetcher),
       }),
     );
   } catch (error) {

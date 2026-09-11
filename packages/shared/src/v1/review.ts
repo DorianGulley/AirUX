@@ -309,6 +309,36 @@ export const getReviewerReviewResponseSchema = z
   .object({ review: reviewerReviewSchema })
   .strict();
 
+export const reviewerReviewSummarySchema = z
+  .object({
+    id: identifierSchema,
+    title: z.string().trim().min(1).max(CONTRACT_LIMITS.titleLength),
+    status: z.literal("pending"),
+    submitted_at: utcTimestampSchema,
+    expires_at: utcTimestampSchema,
+    evidence: z
+      .object({
+        id: identifierSchema,
+        kind: z.literal("browser_video"),
+        status: z.literal("ready"),
+        duration_ms: positiveIntegerSchema
+          .max(CONTRACT_LIMITS.captureDurationMs)
+          .nullable(),
+        width: positiveIntegerSchema
+          .max(CONTRACT_LIMITS.viewportWidth.max)
+          .nullable(),
+        height: positiveIntegerSchema
+          .max(CONTRACT_LIMITS.viewportHeight.max)
+          .nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const listPendingReviewerReviewsResponseSchema = z
+  .object({ reviews: z.array(reviewerReviewSummarySchema).max(100) })
+  .strict();
+
 export const decideReviewerReviewResponseSchema =
   getReviewerReviewResponseSchema;
 
@@ -488,6 +518,10 @@ export type ReviewerReviewDecision = z.infer<
 export type ReviewerReview = z.infer<typeof reviewerReviewSchema>;
 export type GetReviewerReviewResponse = z.infer<
   typeof getReviewerReviewResponseSchema
+>;
+export type ReviewerReviewSummary = z.infer<typeof reviewerReviewSummarySchema>;
+export type ListPendingReviewerReviewsResponse = z.infer<
+  typeof listPendingReviewerReviewsResponseSchema
 >;
 export type DecideReviewerReviewResponse = z.infer<
   typeof decideReviewerReviewResponseSchema
