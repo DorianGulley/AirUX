@@ -92,7 +92,7 @@ describe("agent credential lifecycle", () => {
     expect(JSON.stringify(body)).not.toContain(TEST_ENV.SUPABASE_SECRET_KEY);
   });
 
-  it("lists only credentials filtered to the authenticated owner", async () => {
+  it("lists only active credentials filtered to the authenticated owner", async () => {
     const fetcher = vi.fn(async () =>
       Response.json([
         credentialRow(),
@@ -115,6 +115,7 @@ describe("agent credential lifecycle", () => {
     const [input] = fetcher.mock.calls[0] ?? [];
     const url = new URL(String(input));
     expect(url.searchParams.get("user_id")).toBe(`eq.${REVIEWER.id}`);
+    expect(url.searchParams.get("revoked_at")).toBe("is.null");
     expect(url.searchParams.get("order")).toBe("created_at.desc");
     await expect(response.json()).resolves.toEqual({
       credentials: [
@@ -133,6 +134,24 @@ describe("agent credential lifecycle", () => {
           revoked_at: null,
         },
       ],
+    });
+  });
+
+  it("fails closed if an active listing returns a revoked credential", async () => {
+    const response = await handleAgentCredentialCollection(
+      new Request("https://airux.example/api/v1/agent-credentials"),
+      REVIEWER,
+      TEST_CONFIG,
+      vi.fn(async () =>
+        Response.json([
+          credentialRow({ revoked_at: "2026-08-15T10:00:00+00:00" }),
+        ]),
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: { code: "internal_error", message: "Service unavailable" },
     });
   });
 
@@ -271,6 +290,34 @@ describe("agent credential lifecycle", () => {
       error: {
         code: "rate_limited",
         message: "Active credential limit reached",
+      },
+    });
+  });
+
+  it("returns a generic rate-limit response when the daily creation quota is reached", async () => {
+    const response = await handleAgentCredentialCollection(
+      createRequest({ name: "One credential too many today" }),
+      REVIEWER,
+      TEST_CONFIG,
+      vi.fn(async () =>
+        Response.json(
+          {
+            code: "P0001",
+            details: null,
+            hint: null,
+            message: "daily agent credential creation quota exceeded",
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Daily credential creation limit reached",
       },
     });
   });

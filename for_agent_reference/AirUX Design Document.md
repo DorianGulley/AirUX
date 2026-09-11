@@ -311,6 +311,10 @@ Technical requirements:
 - Updating `last_used_at` is deferred until usage tracking is required independently of authentication.
 - Agent credentials may create Reviews, poll their status, list Reviews they created, and cancel them.
 - Agent credentials cannot view private video or submit decisions.
+- The credential manager lists active credentials only; revoked credentials are
+  retained according to the cleanup policy rather than shown as actionable items.
+- Postgres limits each reviewer to 20 active credentials and 50 credential
+  creations in any rolling 24-hour window.
 - Privileged credential-management queries both filter by the authenticated
   reviewer UUID and reject any returned row whose owner does not match.
 
@@ -519,6 +523,9 @@ Technical requirements:
 - The handler queries Postgres for due Evidence, deletes the corresponding Stream video, and records the result.
 - Failed deletions remain eligible for retry on the next invocation.
 - Deleting a Review immediately revokes access and schedules its Evidence for deletion.
+- The handler deletes revoked credentials after 30 days only when no Review
+  references them, in bounded batches independent of Evidence cleanup.
+- Revoked credentials referenced by Reviews remain available as provenance.
 - Stream’s longer scheduled-deletion feature may be used as a final cleanup backstop.
 
 ### 6.10 REST API
