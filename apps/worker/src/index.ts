@@ -17,6 +17,7 @@ import {
 import { handleReviewPlaybackToken } from "./review-playback.js";
 import { withAuthenticatedReviewer } from "./reviewer-auth.js";
 import {
+  handlePendingReviewerReviewList,
   handleReviewerReviewDecision,
   handleReviewerReviewDelete,
   handleReviewerReviewGet,
@@ -36,6 +37,7 @@ const AGENT_CREDENTIAL_REVOKE_PATH =
 const AGENT_REVIEWS_PATH = "/api/v1/agent/reviews";
 const AGENT_REVIEW_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)$/;
 const AGENT_REVIEW_CANCEL_PATH = /^\/api\/v1\/agent\/reviews\/([^/]+)\/cancel$/;
+const REVIEWER_REVIEWS_PATH = "/api/v1/reviews";
 const REVIEWER_REVIEW_PATH = /^\/api\/v1\/reviews\/([^/]+)$/;
 const REVIEWER_REVIEW_DECISION_PATH = /^\/api\/v1\/reviews\/([^/]+)\/decision$/;
 const REVIEWER_PLAYBACK_TOKEN_PATH =
@@ -347,6 +349,26 @@ const worker = {
       return withReviewerRequestRateLimit(request, env, () =>
         withAuthenticatedReviewer(request, config, (reviewer) =>
           handleReviewerReviewDecision(request, reviewId, reviewer, config),
+        ),
+      );
+    }
+
+    if (pathname === REVIEWER_REVIEWS_PATH) {
+      if (request.method !== "GET") {
+        return jsonResponse(
+          {
+            error: {
+              code: "invalid_request",
+              message: "Method not allowed",
+            },
+          },
+          405,
+          { allow: "GET" },
+        );
+      }
+      return withReviewerRequestRateLimit(request, env, () =>
+        withAuthenticatedReviewer(request, config, (reviewer) =>
+          handlePendingReviewerReviewList(reviewer, config),
         ),
       );
     }

@@ -1047,3 +1047,453 @@ input:focus-visible {
     animation: none;
   }
 }
+
+.app-body {
+  display: block;
+  min-height: 100vh;
+  color: #172016;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgb(180 207 171 / 32%),
+      transparent 34rem
+    ),
+    #edf2e9;
+}
+
+.app-site-header {
+  border-bottom: 1px solid rgb(120 143 115 / 34%);
+  background: rgb(237 242 233 / 88%);
+  backdrop-filter: blur(1rem);
+}
+
+.app-site-header-inner {
+  display: grid;
+  width: min(calc(100% - 3rem), 74rem);
+  min-height: 5.5rem;
+  margin: 0 auto;
+  grid-template-columns: minmax(5rem, 1fr) auto minmax(5rem, 1fr);
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.app-wordmark {
+  color: #172016;
+  font-size: 1.2rem;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  text-decoration: none;
+}
+
+.app-wordmark:focus-visible,
+.app-tab:focus-visible,
+.app-account-link:focus-visible,
+.review-inbox-link:focus-visible {
+  border-radius: 0.4rem;
+  outline: 3px solid #7ead74;
+  outline-offset: 4px;
+}
+
+.app-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 0.25rem;
+}
+
+.app-tab {
+  display: flex;
+  min-width: 6.4rem;
+  padding: 0.25rem 1rem 0;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 3px solid transparent;
+  color: #5b6758;
+  font-size: 0.88rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.app-tab:hover {
+  color: #21391e;
+  background: rgb(251 253 249 / 46%);
+}
+
+.app-tab[aria-current="page"] {
+  border-bottom-color: #3f6a39;
+  color: #21391e;
+}
+
+.app-header-account {
+  min-width: 0;
+  justify-self: end;
+}
+
+.app-account-name {
+  display: block;
+  max-width: 13rem;
+  overflow: hidden;
+  color: #536050;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account-link {
+  color: #3f6a39;
+  font-size: 0.82rem;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.app-account-link:hover {
+  color: #21391e;
+  text-decoration: underline;
+}
+
+.dashboard-shell {
+  width: min(calc(100% - 3rem), 68rem);
+  margin: 0 auto;
+  padding: clamp(2.75rem, 7vw, 5.5rem) 0 4rem;
+}
+
+.dashboard-heading {
+  max-width: 48rem;
+}
+
+.dashboard-heading .eyebrow {
+  margin-bottom: 0.85rem;
+}
+
+.dashboard-title {
+  max-width: 16ch;
+  font-size: clamp(2.5rem, 6.5vw, 4.8rem);
+  line-height: 0.98;
+}
+
+.dashboard-description {
+  max-width: 42rem;
+  margin: 1.25rem 0 0;
+  color: #526050;
+  font-size: clamp(1rem, 1.8vw, 1.12rem);
+  line-height: 1.6;
+}
+
+.dashboard-auth-card,
+.account-card,
+.dashboard-loading-card {
+  width: min(100%, 42rem);
+  margin: clamp(1.5rem, 5vw, 3rem) auto 0;
+  padding: clamp(2rem, 6vw, 4rem);
+  border: 1px solid #cbd7c6;
+  border-radius: 1.5rem;
+  background: #fbfdf9;
+  box-shadow: 0 1.5rem 4rem rgb(33 54 30 / 10%);
+}
+
+.dashboard-auth-card .dashboard-title,
+.account-card .dashboard-title {
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+}
+
+.dashboard-sign-in {
+  margin-top: 2rem;
+}
+
+.dashboard-action-status {
+  min-height: 1.3rem;
+  margin: 0.75rem 0 0;
+  color: #a13028;
+  font-size: 0.82rem;
+}
+
+.dashboard-auth-note {
+  margin: 1.5rem 0 0;
+  color: #687566;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.dashboard-loading-card {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.review-inbox-panel,
+.dashboard-shell > .credential-card {
+  margin-top: clamp(2.25rem, 5vw, 4rem);
+  border: 1px solid #cbd7c6;
+  border-radius: 1.35rem;
+  background: rgb(251 253 249 / 94%);
+  box-shadow: 0 1.5rem 4rem rgb(33 54 30 / 8%);
+}
+
+.review-inbox-panel {
+  overflow: hidden;
+}
+
+.review-inbox-heading {
+  display: flex;
+  min-height: 4.7rem;
+  padding: 1.2rem 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid #dce5d8;
+}
+
+.review-inbox-heading h2,
+.credential-section-heading h2,
+.credential-list-heading h2 {
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+}
+
+.review-inbox-count {
+  display: grid;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.6rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #395334;
+  background: #dfeeda;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.review-inbox-status {
+  min-height: 1.4rem;
+  margin: 0;
+  padding: 0.9rem 1.5rem 0;
+  color: #657163;
+  font-size: 0.82rem;
+}
+
+.review-inbox-status:empty {
+  display: none;
+}
+
+.review-inbox-status[data-state="error"] {
+  padding-bottom: 0.9rem;
+  color: #a13028;
+}
+
+.review-inbox-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-inbox-item + .review-inbox-item {
+  border-top: 1px solid #e3e9e0;
+}
+
+.review-inbox-link {
+  display: grid;
+  padding: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.review-inbox-link:hover {
+  background: #f3f7f0;
+}
+
+.review-inbox-state {
+  color: #3f6a39;
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.review-inbox-title {
+  margin-top: 0.45rem;
+  font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+  letter-spacing: -0.025em;
+}
+
+.review-inbox-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0.7rem 0 0;
+  color: #677364;
+  font-size: 0.8rem;
+}
+
+.review-inbox-action {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #294625;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.review-inbox-play {
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  padding-left: 0.15rem;
+  place-items: center;
+  border-radius: 999px;
+  color: #fff;
+  background: #294625;
+  font-size: 0.75rem;
+}
+
+.review-inbox-empty {
+  padding: clamp(2rem, 6vw, 4rem) 1.5rem;
+  text-align: center;
+}
+
+.review-inbox-empty h3,
+.review-inbox-empty p {
+  margin: 0;
+}
+
+.review-inbox-empty h3 {
+  font-size: 1.25rem;
+}
+
+.review-inbox-empty p {
+  max-width: 31rem;
+  margin: 0.65rem auto 0;
+  color: #657163;
+  line-height: 1.55;
+}
+
+.dashboard-shell > .credential-card {
+  width: 100%;
+  padding: clamp(1.5rem, 5vw, 3rem);
+}
+
+.credential-section-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(16rem, 1.2fr);
+  align-items: end;
+  gap: 2rem;
+}
+
+.credential-section-heading p {
+  margin: 0;
+  color: #566353;
+  line-height: 1.55;
+}
+
+.account-card {
+  margin-top: 0;
+}
+
+.account-identity {
+  margin: 2rem 0 1.25rem;
+  padding: 1.2rem 1.3rem;
+  border: 1px solid #dce5d8;
+  border-radius: 0.9rem;
+  background: #f4f7f2;
+}
+
+.account-identity-label,
+.account-identity-name {
+  margin: 0;
+}
+
+.account-identity-label {
+  color: #657163;
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.account-identity-name {
+  margin-top: 0.35rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+@media (max-width: 46rem) {
+  .app-site-header-inner {
+    width: min(calc(100% - 2rem), 74rem);
+    min-height: auto;
+    grid-template-columns: 1fr auto;
+    gap: 0.75rem 1rem;
+  }
+
+  .app-wordmark,
+  .app-header-account {
+    min-height: 3.4rem;
+    align-content: center;
+  }
+
+  .app-tabs {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    min-height: 3rem;
+  }
+
+  .app-tab {
+    min-width: 0;
+    flex: 1;
+    padding: 0 0.65rem;
+  }
+
+  .dashboard-shell,
+  .review-state-shell {
+    width: min(calc(100% - 2rem), 74rem);
+  }
+
+  .credential-section-heading {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 36rem) {
+  .app-site-header-inner {
+    width: 100%;
+    padding: 0 1rem;
+  }
+
+  .app-account-name {
+    max-width: 9rem;
+  }
+
+  .dashboard-shell,
+  .review-state-shell {
+    width: 100%;
+    padding: 2.25rem 1rem 3rem;
+  }
+
+  .dashboard-auth-card,
+  .account-card,
+  .dashboard-loading-card,
+  .review-inbox-panel,
+  .dashboard-shell > .credential-card {
+    border-radius: 1rem;
+  }
+
+  .review-inbox-link {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .review-inbox-action {
+    justify-content: flex-start;
+  }
+
+  .dashboard-shell > .credential-card {
+    border-right: 1px solid #cbd7c6;
+    border-bottom: 1px solid #cbd7c6;
+    border-left: 1px solid #cbd7c6;
+  }
+}

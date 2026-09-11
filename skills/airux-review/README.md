@@ -19,7 +19,7 @@ to a custom domain.
 
 1. Open `https://airux-prod.airux-platform.workers.dev` on a trusted device.
 2. Select **Continue with GitHub** and finish sign-in.
-3. Under **Agent credentials**, enter a name that identifies this agent
+3. Open the **Credentials** tab. Under **Agent credentials**, enter a name that identifies this agent
    environment, such as `Codex on laptop`.
 4. Select **Create credential**, copy the displayed token, and store it
    securely. AirUX shows the token only once.
@@ -114,7 +114,7 @@ To rotate a credential without downtime, create and configure its replacement
 before revoking the old one.
 
 1. Open the AirUX production application and sign in.
-2. Under **Agent credentials**, select **Revoke** beside the old credential.
+2. Open the **Credentials** tab, then select **Revoke** beside the old credential.
    Revocation takes effect on the next authenticated AirUX request.
 3. Remove the local MCP configuration if the environment should no longer have
    AirUX access:

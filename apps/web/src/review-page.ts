@@ -6,6 +6,7 @@ import type {
 import { CONTRACT_LIMITS } from "@airux/shared/v1/limits";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 
+import { renderAppPage } from "./app-shell.js";
 import {
   createReviewerAuthClient,
   getOAuthCallbackCleanupPath,
@@ -22,7 +23,6 @@ import {
   observeReviewSession,
   restoreReviewSession,
   signInToReview,
-  signOutFromReview,
 } from "./review-auth.js";
 import {
   decideReviewFixture,
@@ -41,45 +41,6 @@ function createElement<K extends keyof HTMLElementTagNameMap>(
     element.className = className;
   }
   return element;
-}
-
-interface ReviewHeaderAccount {
-  readonly displayName: string;
-  readonly onSignOut: (
-    button: HTMLButtonElement,
-    status: HTMLParagraphElement,
-  ) => void;
-}
-
-function createBrandHeader(account?: ReviewHeaderAccount) {
-  const header = createElement("header", "review-site-header");
-  const homeLink = createElement("a", "review-wordmark");
-  homeLink.href = "/";
-  homeLink.textContent = "AirUX";
-  homeLink.setAttribute("aria-label", "AirUX home");
-
-  if (account === undefined) {
-    const context = createElement("p", "review-site-context");
-    context.textContent = "Human review";
-    header.append(homeLink, context);
-    return header;
-  }
-
-  const accountPanel = createElement("div", "review-account");
-  const identity = createElement("p", "review-account-name");
-  identity.textContent = account.displayName;
-  const signOutButton = createElement("button", "review-sign-out");
-  signOutButton.type = "button";
-  signOutButton.textContent = "Sign out";
-  const status = createElement("p", "review-account-status");
-  status.setAttribute("role", "status");
-  status.setAttribute("aria-live", "polite");
-  signOutButton.addEventListener("click", () => {
-    account.onSignOut(signOutButton, status);
-  });
-  accountPanel.append(identity, signOutButton, status);
-  header.append(homeLink, accountPanel);
-  return header;
 }
 
 function createLoadingState() {
@@ -466,8 +427,11 @@ function createAuthErrorState(retryHref: string) {
   return main;
 }
 
-function renderPageState(state: HTMLElement, account?: ReviewHeaderAccount) {
-  document.body.replaceChildren(createBrandHeader(account), state);
+function renderPageState(
+  state: HTMLElement,
+  displayName: string | null = null,
+) {
+  renderAppPage("reviews", displayName, state);
 }
 
 function clearOAuthParameters() {
@@ -510,23 +474,8 @@ export async function initializeReviewPage(
       return;
     }
 
-    const account = {
-      displayName: getSessionDisplayName(session) ?? "GitHub user",
-      onSignOut: (button: HTMLButtonElement, status: HTMLParagraphElement) => {
-        if (authClient === undefined) {
-          return;
-        }
-        button.disabled = true;
-        status.textContent = "Signing out…";
-        void signOutFromReview(authClient.auth)
-          .then(() => renderSession(null))
-          .catch(() => {
-            button.disabled = false;
-            status.textContent = "Sign-out failed. Please try again.";
-          });
-      },
-    } satisfies ReviewHeaderAccount;
-    renderPageState(createLoadingState(), account);
+    const displayName = getSessionDisplayName(session) ?? "GitHub user";
+    renderPageState(createLoadingState(), displayName);
 
     try {
       const fixtureMode = getReviewFixtureMode(searchParams);
@@ -580,7 +529,7 @@ export async function initializeReviewPage(
         document.title = `${currentReview.title} | AirUX`;
         renderPageState(
           createReadyState(currentReview, currentPlayback, onDecision),
-          account,
+          displayName,
         );
       };
       renderReview(review, playback);
@@ -589,7 +538,7 @@ export async function initializeReviewPage(
         return;
       }
       document.title = "Review unavailable | AirUX";
-      renderPageState(createErrorState(), account);
+      renderPageState(createErrorState(), displayName);
     }
   };
 

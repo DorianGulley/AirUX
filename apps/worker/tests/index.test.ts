@@ -364,6 +364,7 @@ describe("AirUX Worker", () => {
     vi.stubGlobal("fetch", fetcher);
 
     for (const request of [
+      new Request("https://airux.app/api/v1/reviews"),
       new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`),
       new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`, {
         method: "DELETE",
@@ -387,7 +388,41 @@ describe("AirUX Worker", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 
+  it("lists the authenticated reviewer's playback-ready inbox", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/auth/v1/user") {
+        return authenticatedReviewerResponse();
+      }
+      if (url.pathname === "/rest/v1/reviews") {
+        expect(url.searchParams.get("user_id")).toBe(`eq.${REVIEWER_ID}`);
+        expect(url.searchParams.get("status")).toBe("eq.pending");
+        return Response.json([]);
+      }
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetcher);
+
+    const response = await worker.fetch(
+      new Request("https://airux.app/api/v1/reviews", {
+        headers: { authorization: "Bearer header.payload.signature" },
+      }),
+      TEST_ENV,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ reviews: [] });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("advertises reviewer Review methods before authentication", () => {
+    const collection = worker.fetch(
+      new Request("https://airux.app/api/v1/reviews", { method: "POST" }),
+      TEST_ENV,
+    );
+    expect(collection.status).toBe(405);
+    expect(collection.headers.get("allow")).toBe("GET");
+
     const detail = worker.fetch(
       new Request(`https://airux.app/api/v1/reviews/${CREDENTIAL_ID}`, {
         method: "POST",

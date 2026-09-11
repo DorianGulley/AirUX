@@ -76,11 +76,17 @@ cancellation are not charged against that creation limit.
 Authenticated reviewers retrieve and decide their Reviews through:
 
 ```text
+GET    /api/v1/reviews
 GET    /api/v1/reviews/:id
 DELETE /api/v1/reviews/:id
 POST   /api/v1/evidence/:id/playback-token
 POST   /api/v1/reviews/:id/decision
 ```
+
+The collection route returns at most 100 owned, nondeleted pending Reviews with
+ready Evidence, newest submission first. Its compact summaries omit claim,
+criteria, ownership, credential, Stream video, and deletion fields, and playback
+tokens are issued only after a reviewer opens an item.
 
 These routes filter by the authenticated reviewer ID and return the same `404`
 for malformed, missing, deleted, or foreign Review IDs. Reviewer responses
