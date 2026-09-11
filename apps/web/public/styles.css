@@ -1171,6 +1171,10 @@ input:focus-visible {
   line-height: 0.98;
 }
 
+.dashboard-title[tabindex="-1"]:focus {
+  outline: none;
+}
+
 .dashboard-description {
   max-width: 42rem;
   margin: 1.25rem 0 0;

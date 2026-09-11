@@ -4,6 +4,7 @@ import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import {
   type DashboardTab,
   getDashboardLandingPath,
+  getDashboardNavigationPath,
   matchDashboardRoute,
 } from "./app-route.js";
 import { renderAppPage } from "./app-shell.js";
@@ -19,7 +20,11 @@ import {
   listAgentCredentials,
   revokeAgentCredential,
 } from "./credential-api.js";
+import { MemoryResourceCache } from "./memory-resource-cache.js";
 import { listPendingReviewerReviews } from "./review-api.js";
+
+const REVIEW_CACHE_TTL_MS = 30_000;
+const CREDENTIAL_CACHE_TTL_MS = 60_000;
 
 function createElement<K extends keyof HTMLElementTagNameMap>(
   tagName: K,
@@ -204,6 +209,7 @@ function createReviewsPage(
   session: Session,
   sequence: number,
   isCurrent: (sequence: number, session: Session) => boolean,
+  cache: MemoryResourceCache<ReviewerReviewSummary[]>,
 ) {
   const main = createDashboardMain();
   main.append(
@@ -238,24 +244,42 @@ function createReviewsPage(
   panel.append(panelHeading, status, list, empty);
   main.append(panel);
 
-  void listPendingReviewerReviews(session.access_token)
+  const renderReviews = (reviews: ReviewerReviewSummary[]) => {
+    list.replaceChildren(...reviews.map(createReviewListItem));
+    count.textContent = String(reviews.length);
+    status.textContent = "";
+    status.removeAttribute("data-state");
+    empty.hidden = reviews.length !== 0;
+  };
+  const cached = cache.read();
+  if (cached !== null) {
+    renderReviews(cached.value);
+  }
+  if (cached?.isFresh === true) {
+    return main;
+  }
+
+  void cache
+    .load(() => listPendingReviewerReviews(session.access_token))
     .then((reviews) => {
-      if (!isCurrent(sequence, session)) {
+      if (reviews === undefined || !isCurrent(sequence, session)) {
         return;
       }
-      list.replaceChildren(...reviews.map(createReviewListItem));
-      count.textContent = String(reviews.length);
-      status.textContent = "";
-      empty.hidden = reviews.length !== 0;
+      renderReviews(reviews);
     })
     .catch(() => {
       if (!isCurrent(sequence, session)) {
         return;
       }
-      count.textContent = "—";
       status.dataset.state = "error";
-      status.textContent =
-        "Your pending reviews couldn’t be loaded. Reload to try again.";
+      if (cached === null) {
+        count.textContent = "—";
+        status.textContent =
+          "Your pending reviews couldn’t be loaded. Reload to try again.";
+      } else {
+        status.textContent =
+          "Reviews couldn’t be refreshed. Showing your most recent results.";
+      }
     });
   return main;
 }
@@ -299,6 +323,7 @@ function createCredentialsPage(
   session: Session,
   sequence: number,
   isCurrent: (sequence: number, session: Session) => boolean,
+  cache: MemoryResourceCache<AgentCredential[]>,
 ) {
   const main = createDashboardMain();
   main.append(
@@ -390,7 +415,10 @@ function createCredentialsPage(
           button.disabled = true;
           setStatus(`Revoking ${selected.name}…`);
           void revokeAgentCredential(selected.id, session.access_token)
-            .then(() => loadCredentials(`${selected.name} was revoked.`))
+            .then(() => {
+              cache.clear();
+              return loadCredentials(`${selected.name} was revoked.`, true);
+            })
             .catch(() => {
               if (!isCurrent(sequence, session)) {
                 return;
@@ -406,20 +434,40 @@ function createCredentialsPage(
     );
     empty.hidden = active.length !== 0;
   };
-  const loadCredentials = async (successMessage = "") => {
+  const loadCredentials = async (successMessage = "", force = false) => {
+    const cached = cache.read();
+    if (cached !== null) {
+      renderCredentials(cached.value);
+    }
+    if (!force && cached?.isFresh === true) {
+      setStatus(successMessage);
+      return;
+    }
+
     refreshButton.disabled = true;
-    setStatus(successMessage === "" ? "Loading credentials…" : successMessage);
+    if (cached === null || force) {
+      setStatus(
+        successMessage === "" ? "Loading credentials…" : successMessage,
+      );
+    } else {
+      setStatus(successMessage);
+    }
     try {
-      const result = await listAgentCredentials(session.access_token);
-      if (!isCurrent(sequence, session)) {
+      const credentials = await cache.load(async () => {
+        const result = await listAgentCredentials(session.access_token);
+        return result.credentials;
+      });
+      if (credentials === undefined || !isCurrent(sequence, session)) {
         return;
       }
-      renderCredentials(result.credentials);
+      renderCredentials(credentials);
       setStatus(successMessage);
     } catch {
       if (isCurrent(sequence, session)) {
         setStatus(
-          "Credentials are temporarily unavailable. Please try again.",
+          cached === null
+            ? "Credentials are temporarily unavailable. Please try again."
+            : "Credentials couldn’t be refreshed. Showing your most recent results.",
           true,
         );
       }
@@ -448,7 +496,8 @@ function createCredentialsPage(
         secret.hidden = false;
         copyButton.focus();
         setStatus("Credential created.");
-        await loadCredentials("Credential created.");
+        cache.clear();
+        await loadCredentials("Credential created.", true);
       })
       .catch(() => {
         if (!isCurrent(sequence, session)) {
@@ -488,14 +537,21 @@ function createCredentialsPage(
     nameInput.focus();
   });
   refreshButton.addEventListener("click", () => {
-    void loadCredentials();
+    void loadCredentials("", true);
   });
-  window.addEventListener("pagehide", clearSecret, { once: true });
+  const handlePageHide = () => clearSecret();
+  window.addEventListener("pagehide", handlePageHide);
 
   panel.append(formHeading, form, status, secret, listHeading, empty, list);
   main.append(panel);
   void loadCredentials();
-  return main;
+  return {
+    element: main,
+    cleanup: () => {
+      clearSecret();
+      window.removeEventListener("pagehide", handlePageHide);
+    },
+  };
 }
 
 function createAccountPage(
@@ -540,13 +596,49 @@ function clearOAuthParameters() {
 
 export async function initializeDashboardPage() {
   let route = matchDashboardRoute(window.location.pathname);
-  const isRoot = window.location.pathname === "/";
+  let needsLandingResolution = window.location.pathname === "/";
   let activeTab: DashboardTab = route?.tab ?? "reviews";
   let authClient: SupabaseClient | undefined;
   let currentSession: Session | null = null;
   let renderSequence = 0;
+  let cacheOwnerId: string | null = null;
+  let activePageCleanup: (() => void) | undefined;
+  const reviewsCache = new MemoryResourceCache<ReviewerReviewSummary[]>(
+    REVIEW_CACHE_TTL_MS,
+  );
+  const credentialsCache = new MemoryResourceCache<AgentCredential[]>(
+    CREDENTIAL_CACHE_TTL_MS,
+  );
 
   createLoadingPage(activeTab);
+
+  const renderDashboardPage = (
+    tab: DashboardTab,
+    displayName: string | null,
+    content: HTMLElement,
+    focusContent = false,
+    cleanup?: () => void,
+  ) => {
+    activePageCleanup?.();
+    activePageCleanup = cleanup;
+    renderAppPage(tab, displayName, content);
+    if (focusContent) {
+      const focusTarget = content.querySelector<HTMLElement>("h1") ?? content;
+      focusTarget.tabIndex = -1;
+      focusTarget.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+  };
+
+  const alignCacheOwner = (session: Session | null) => {
+    const userId = session?.user.id ?? null;
+    if (userId === cacheOwnerId) {
+      return;
+    }
+    reviewsCache.clear();
+    credentialsCache.clear();
+    cacheOwnerId = userId;
+  };
 
   const startSignIn = (
     button: HTMLButtonElement,
@@ -574,21 +666,24 @@ export async function initializeDashboardPage() {
       });
   };
 
-  const renderSession = (session: Session | null) => {
+  const renderSession = (session: Session | null, focusContent = false) => {
     currentSession = session;
+    alignCacheOwner(session);
     const sequence = ++renderSequence;
-    if (isRoot && route === null) {
+    if (needsLandingResolution) {
       const landingPath = getDashboardLandingPath(session !== null);
       window.history.replaceState({}, "", landingPath);
       route = matchDashboardRoute(landingPath);
       activeTab = route?.tab ?? "reviews";
+      needsLandingResolution = false;
     }
-    if (!isRoot && route === null) {
+    if (route === null) {
       document.title = "Page unavailable | AirUX";
-      renderAppPage(
+      renderDashboardPage(
         "reviews",
         getSessionDisplayName(session),
         createNotFoundPage(),
+        focusContent,
       );
       return;
     }
@@ -599,7 +694,12 @@ export async function initializeDashboardPage() {
           ? "Sign in"
           : `${activeTab[0]?.toUpperCase()}${activeTab.slice(1)}`;
       document.title = `${title} | AirUX`;
-      renderAppPage(activeTab, null, createSignInState(activeTab, startSignIn));
+      renderDashboardPage(
+        activeTab,
+        null,
+        createSignInState(activeTab, startSignIn),
+        focusContent,
+      );
       return;
     }
 
@@ -609,25 +709,34 @@ export async function initializeDashboardPage() {
       currentSession?.user.id === expectedSession.user.id;
     if (activeTab === "reviews") {
       document.title = "Reviews | AirUX";
-      renderAppPage(
+      renderDashboardPage(
         activeTab,
         displayName,
-        createReviewsPage(session, sequence, isCurrent),
+        createReviewsPage(session, sequence, isCurrent, reviewsCache),
+        focusContent,
       );
       return;
     }
     if (activeTab === "credentials") {
       document.title = "Credentials | AirUX";
-      renderAppPage(
+      const page = createCredentialsPage(
+        session,
+        sequence,
+        isCurrent,
+        credentialsCache,
+      );
+      renderDashboardPage(
         activeTab,
         displayName,
-        createCredentialsPage(session, sequence, isCurrent),
+        page.element,
+        focusContent,
+        page.cleanup,
       );
       return;
     }
 
     document.title = "Account | AirUX";
-    renderAppPage(
+    renderDashboardPage(
       activeTab,
       displayName,
       createAccountPage(session, (button, status) => {
@@ -649,8 +758,54 @@ export async function initializeDashboardPage() {
             status.textContent = "Sign-out failed. Please try again.";
           });
       }),
+      focusContent,
     );
   };
+
+  document.addEventListener("click", (event) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element)
+    ) {
+      return;
+    }
+    const link = event.target.closest<HTMLAnchorElement>("a[href]");
+    if (
+      link === null ||
+      link.hasAttribute("download") ||
+      (link.target !== "" && link.target !== "_self")
+    ) {
+      return;
+    }
+    const path = getDashboardNavigationPath(link.href, window.location.origin);
+    if (path === null) {
+      return;
+    }
+    event.preventDefault();
+    if (
+      window.location.pathname === path &&
+      window.location.search === "" &&
+      window.location.hash === ""
+    ) {
+      return;
+    }
+    window.history.pushState({}, "", path);
+    route = matchDashboardRoute(path);
+    activeTab = route?.tab ?? activeTab;
+    renderSession(currentSession, true);
+  });
+
+  window.addEventListener("popstate", () => {
+    needsLandingResolution = window.location.pathname === "/";
+    route = matchDashboardRoute(window.location.pathname);
+    activeTab = route?.tab ?? activeTab;
+    renderSession(currentSession, true);
+  });
 
   try {
     const config = await loadBrowserConfig();
@@ -667,7 +822,7 @@ export async function initializeDashboardPage() {
   } catch {
     clearOAuthParameters();
     document.title = "AirUX unavailable";
-    renderAppPage(
+    renderDashboardPage(
       activeTab,
       null,
       createErrorPage(

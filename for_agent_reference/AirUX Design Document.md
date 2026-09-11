@@ -131,6 +131,8 @@ The reviewer web application uses one route-based console with **Reviews**,
 Credentials contains the agent credential lifecycle; and Account contains the
 reviewer identity and sign-in or sign-out action. Direct Review links retain the
 same console navigation and return the user to that Review after authentication.
+Console tab navigation updates browser history without reloading the document,
+so the authenticated application session remains active between tabs.
 
 The Reviews tab is an inbox of unresolved Reviews whose video Evidence is ready
 for playback. It presents compact metadata and links to the focused Review page
@@ -346,6 +348,11 @@ Technical requirements:
 
 - The reviewer browser lists only owned, nondeleted `pending` Reviews with
   `ready` Evidence, ordered by submission time with the newest first.
+- The console keeps Review summaries and active credential metadata in
+  user-scoped memory for 30 and 60 seconds respectively. Fresh entries avoid a
+  request; stale entries remain visible while one deduplicated refresh runs.
+- Cached private data is never persisted, is cleared when the authenticated
+  user changes, and credential mutations invalidate the credential cache.
 - The reviewer browser requests Review data from the API after the reviewer
   selects a Review.
 - After authorization, the API returns a short-lived Stream playback token.

@@ -21,3 +21,24 @@ export function matchDashboardRoute(pathname: string): DashboardRoute | null {
 export function getDashboardLandingPath(isSignedIn: boolean) {
   return isSignedIn ? "/reviews" : "/account";
 }
+
+export function getDashboardNavigationPath(
+  href: string,
+  currentOrigin: string,
+) {
+  let url: URL;
+  try {
+    url = new URL(href, currentOrigin);
+  } catch {
+    return null;
+  }
+  if (
+    url.origin !== currentOrigin ||
+    url.search !== "" ||
+    url.hash !== "" ||
+    matchDashboardRoute(url.pathname) === null
+  ) {
+    return null;
+  }
+  return url.pathname;
+}
